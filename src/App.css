@@ -250,6 +250,15 @@ button:disabled { opacity: 0.45; cursor: not-allowed; }
   gap: 8px;
 }
 .hc-modal-wide { min-width: 640px; max-width: 90vw; max-height: 85vh; }
+.hc-modal-body {
+  flex: 1;
+  overflow-y: auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.hc-modal-body > * { flex-shrink: 0; }
 
 .hc-stats {
   display: grid;
@@ -462,6 +471,8 @@ button:disabled { opacity: 0.45; cursor: not-allowed; }
   border: 1px solid var(--border);
   border-radius: 8px;
   height: 220px;
+  min-height: 220px;
+  flex-shrink: 0;
   overflow: hidden;
 }
 .hc-iframe {

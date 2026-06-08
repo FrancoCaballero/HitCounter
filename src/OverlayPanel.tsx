@@ -70,6 +70,7 @@ export function OverlayPanel({ onClose }: { onClose: () => void }) {
           <button className="hc-x" onClick={onClose}>×</button>
         </header>
 
+        <div className="hc-modal-body">
         <section className="hc-theme-grid">
           {THEMES.map((t) => (
             <div
@@ -150,6 +151,7 @@ export function OverlayPanel({ onClose }: { onClose: () => void }) {
           <input readOnly value={url} onFocus={(e) => e.currentTarget.select()} />
           <button onClick={copy}>Copy</button>
         </section>
+        </div>
 
         <div className="hc-modal-foot">
           <button

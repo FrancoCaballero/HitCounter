@@ -13,8 +13,10 @@
     "windows": [
       {
         "title": "hitcounter",
-        "width": 800,
-        "height": 600
+        "width": 1100,
+        "height": 800,
+        "minWidth": 700,
+        "minHeight": 500
       }
     ],
     "security": {

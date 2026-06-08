@@ -69,35 +69,37 @@ export function TemplatesPanel({ onClose }: { onClose: () => void }) {
           onChange={(e) => setFilter(e.currentTarget.value)}
         />
 
-        <section className="hc-tpl-section">
-          <h4>Built-in</h4>
-          <div className="hc-tpl-grid">
-            {filt(BUILTIN_TEMPLATES).map((t) => (
-              <TemplateCard key={t.id} t={t} onApply={() => tryApply(t)} />
-            ))}
-          </div>
-        </section>
-
-        <section className="hc-tpl-section">
-          <h4>My templates</h4>
-          {customs.length === 0 ? (
-            <div className="hc-empty">
-              No custom templates. Save your current setup below.
-            </div>
-          ) : (
+        <div className="hc-modal-body">
+          <section className="hc-tpl-section">
+            <h4>Built-in</h4>
             <div className="hc-tpl-grid">
-              {filt(customs).map((t) => (
-                <TemplateCard
-                  key={t.id}
-                  t={t}
-                  onApply={() => tryApply(t)}
-                  onRemove={() => removeCustom(t.id)}
-                  onRename={(name) => renameCustom(t.id, name)}
-                />
+              {filt(BUILTIN_TEMPLATES).map((t) => (
+                <TemplateCard key={t.id} t={t} onApply={() => tryApply(t)} />
               ))}
             </div>
-          )}
-        </section>
+          </section>
+
+          <section className="hc-tpl-section">
+            <h4>My templates</h4>
+            {customs.length === 0 ? (
+              <div className="hc-empty">
+                No custom templates. Save your current setup below.
+              </div>
+            ) : (
+              <div className="hc-tpl-grid">
+                {filt(customs).map((t) => (
+                  <TemplateCard
+                    key={t.id}
+                    t={t}
+                    onApply={() => tryApply(t)}
+                    onRemove={() => removeCustom(t.id)}
+                    onRename={(name) => renameCustom(t.id, name)}
+                  />
+                ))}
+              </div>
+            )}
+          </section>
+        </div>
 
         <div className="hc-modal-foot">
           <input
