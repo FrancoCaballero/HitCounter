@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { getOverlayUrl, loadStyle, pushStyle, DEFAULT_STYLE, OverlayStyle } from "./sync";
+import { getOverlayUrl, loadStyle, pushStyle, DEFAULT_STYLE, OverlayStyle, BG_PRESETS, Background, BackgroundFit } from "./sync";
 
 type Theme = {
   id: string;
@@ -40,6 +40,8 @@ export function OverlayPanel({ onClose }: { onClose: () => void }) {
   const [noShadow, setNoShadow] = useState(initial.noShadow);
   const [titleFont, setTitleFont] = useState(initial.titleFont);
   const [tableRows, setTableRows] = useState(initial.tableRows);
+  const [background, setBackground] = useState<Background>(initial.background);
+  const [bgError, setBgError] = useState<string | null>(null);
   const [show, setShow] = useState(initial.show);
   const [base, setBase] = useState("http://localhost:17800/");
   const debounceRef = useRef<number | null>(null);
@@ -48,7 +50,7 @@ export function OverlayPanel({ onClose }: { onClose: () => void }) {
     getOverlayUrl().then(setBase);
   }, []);
 
-  const style: OverlayStyle = { theme, accent, text, scale, noShadow, titleFont, tableRows, show };
+  const style: OverlayStyle = { theme, accent, text, scale, noShadow, titleFont, tableRows, background, show };
 
   useEffect(() => {
     if (debounceRef.current !== null) window.clearTimeout(debounceRef.current);
@@ -58,7 +60,7 @@ export function OverlayPanel({ onClose }: { onClose: () => void }) {
     return () => {
       if (debounceRef.current !== null) window.clearTimeout(debounceRef.current);
     };
-  }, [theme, accent, text, scale, noShadow, titleFont, tableRows, show]);
+  }, [theme, accent, text, scale, noShadow, titleFont, tableRows, background, show]);
 
   function toggle(key: keyof OverlayStyle["show"]) {
     setShow((s) => ({ ...s, [key]: !s[key] }));
@@ -66,6 +68,22 @@ export function OverlayPanel({ onClose }: { onClose: () => void }) {
 
   async function copy() {
     await navigator.clipboard.writeText(base);
+  }
+
+  function onPickImage(file: File) {
+    setBgError(null);
+    const MAX = 4 * 1024 * 1024;
+    if (file.size > MAX) {
+      setBgError(`Imagen muy grande (${(file.size / 1024 / 1024).toFixed(1)}MB). Máx 4MB.`);
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => {
+      const dataUrl = String(reader.result || "");
+      setBackground({ kind: "image", value: dataUrl, fit: background.fit || "cover" });
+    };
+    reader.onerror = () => setBgError("No se pudo leer el archivo.");
+    reader.readAsDataURL(file);
   }
 
   function reset() {
@@ -76,6 +94,8 @@ export function OverlayPanel({ onClose }: { onClose: () => void }) {
     setNoShadow(DEFAULT_STYLE.noShadow);
     setTitleFont(DEFAULT_STYLE.titleFont);
     setTableRows(DEFAULT_STYLE.tableRows);
+    setBackground({ ...DEFAULT_STYLE.background });
+    setBgError(null);
     setShow({ ...DEFAULT_STYLE.show });
   }
 
@@ -220,6 +240,99 @@ export function OverlayPanel({ onClose }: { onClose: () => void }) {
                 </label>
               </div>
             </>
+          )}
+        </section>
+
+        <section className="hc-theme-customize">
+          <h4>Background</h4>
+          <div className="hc-bg-modes">
+            <button
+              className={`hc-bg-mode ${background.kind === "none" ? "active" : ""}`}
+              onClick={() => setBackground({ kind: "none", value: "", fit: background.fit })}
+            >Transparent</button>
+            <button
+              className={`hc-bg-mode ${background.kind === "color" ? "active" : ""}`}
+              onClick={() => setBackground({ kind: "color", value: background.kind === "color" ? background.value : "#101218", fit: background.fit })}
+            >Solid color</button>
+            <button
+              className={`hc-bg-mode ${background.kind === "preset" ? "active" : ""}`}
+              onClick={() => setBackground({ kind: "preset", value: background.kind === "preset" ? background.value : BG_PRESETS[0].id, fit: background.fit })}
+            >Preset</button>
+            <button
+              className={`hc-bg-mode ${background.kind === "image" ? "active" : ""}`}
+              onClick={() => {
+                if (background.kind !== "image") setBackground({ kind: "image", value: "", fit: background.fit || "cover" });
+              }}
+            >Image</button>
+          </div>
+
+          {background.kind === "color" && (
+            <div className="hc-theme-fields" style={{ marginTop: 10 }}>
+              <label>
+                <span>Color</span>
+                <input
+                  type="color"
+                  value={background.value || "#101218"}
+                  onChange={(e) => setBackground({ ...background, value: e.currentTarget.value })}
+                />
+              </label>
+            </div>
+          )}
+
+          {background.kind === "preset" && (
+            <div className="hc-bg-presets" style={{ marginTop: 10 }}>
+              {BG_PRESETS.map((p) => (
+                <div
+                  key={p.id}
+                  className={`hc-bg-preset ${background.value === p.id ? "active" : ""}`}
+                  style={{ background: p.css }}
+                  onClick={() => setBackground({ ...background, value: p.id })}
+                  title={p.name}
+                >
+                  <span>{p.name}</span>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {background.kind === "image" && (
+            <div style={{ marginTop: 10, display: "flex", flexDirection: "column", gap: 8 }}>
+              <input
+                type="file"
+                accept="image/*"
+                onChange={(e) => {
+                  const f = e.currentTarget.files?.[0];
+                  if (f) onPickImage(f);
+                  e.currentTarget.value = "";
+                }}
+              />
+              {bgError && <small style={{ color: "var(--bad)" }}>{bgError}</small>}
+              {background.value && (
+                <>
+                  <div className="hc-bg-thumb" style={{ backgroundImage: `url(${background.value})` }} />
+                  <div className="hc-theme-fields">
+                    <label>
+                      <span>Fit</span>
+                      <select
+                        className="hc-font-select"
+                        value={background.fit}
+                        onChange={(e) => setBackground({ ...background, fit: e.currentTarget.value as BackgroundFit })}
+                      >
+                        <option value="cover">Cover</option>
+                        <option value="contain">Contain</option>
+                        <option value="tile">Tile</option>
+                      </select>
+                    </label>
+                    <button
+                      onClick={() => setBackground({ kind: "image", value: "", fit: background.fit })}
+                    >Remove image</button>
+                  </div>
+                </>
+              )}
+              <small style={{ color: "var(--muted)" }}>
+                Máx 4MB. La imagen se guarda local y se envía al overlay vía WebSocket.
+              </small>
+            </div>
           )}
         </section>
 

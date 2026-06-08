@@ -98,6 +98,28 @@ export async function getOverlayUrl(): Promise<string> {
   }
 }
 
+export type BackgroundKind = "none" | "preset" | "color" | "image";
+export type BackgroundFit = "cover" | "contain" | "tile";
+
+export type Background = {
+  kind: BackgroundKind;
+  value: string;
+  fit: BackgroundFit;
+};
+
+export type BgPreset = { id: string; name: string; css: string };
+
+export const BG_PRESETS: BgPreset[] = [
+  { id: "midnight", name: "Midnight", css: "linear-gradient(135deg, #0f0c29 0%, #302b63 50%, #24243e 100%)" },
+  { id: "sunset", name: "Sunset", css: "linear-gradient(135deg, #ff7e5f 0%, #feb47b 100%)" },
+  { id: "forest", name: "Forest", css: "linear-gradient(135deg, #134e5e 0%, #71b280 100%)" },
+  { id: "neon", name: "Neon", css: "linear-gradient(135deg, #ff00cc 0%, #333399 100%)" },
+  { id: "mono", name: "Mono", css: "linear-gradient(135deg, #232526 0%, #414345 100%)" },
+  { id: "ember", name: "Ember", css: "radial-gradient(circle at 30% 30%, #ff512f 0%, #dd2476 100%)" },
+  { id: "ocean", name: "Ocean", css: "linear-gradient(135deg, #2b5876 0%, #4e4376 100%)" },
+  { id: "blood", name: "Blood", css: "linear-gradient(135deg, #200122 0%, #6f0000 100%)" },
+];
+
 export type OverlayStyle = {
   theme: string;
   accent: string;
@@ -106,6 +128,7 @@ export type OverlayStyle = {
   noShadow: boolean;
   titleFont: string;
   tableRows: number;
+  background: Background;
   show: {
     title: boolean;
     totalHits: boolean;
@@ -128,6 +151,7 @@ export const DEFAULT_STYLE: OverlayStyle = {
   noShadow: false,
   titleFont: "",
   tableRows: 8,
+  background: { kind: "none", value: "", fit: "cover" },
   show: {
     title: true,
     totalHits: true,
@@ -152,6 +176,7 @@ export function loadStyle(): OverlayStyle {
     return {
       ...DEFAULT_STYLE,
       ...parsed,
+      background: { ...DEFAULT_STYLE.background, ...(parsed.background || {}) },
       show: { ...DEFAULT_STYLE.show, ...(parsed.show || {}) },
     };
   } catch {

@@ -229,6 +229,51 @@
   const validThemes = ["default", "compact", "vertical", "hits", "minimal", "bigsplit", "table"];
   const validFonts = ["cinzel","orbitron","pressstart","russo","blackops","bebas","audiowide","creepster","bungee","metal"];
   const DEFAULT_SHADOW = "0 2px 6px rgba(0,0,0,0.85), 0 0 14px rgba(0,0,0,0.6)";
+  const BG_PRESETS = {
+    midnight: "linear-gradient(135deg, #0f0c29 0%, #302b63 50%, #24243e 100%)",
+    sunset: "linear-gradient(135deg, #ff7e5f 0%, #feb47b 100%)",
+    forest: "linear-gradient(135deg, #134e5e 0%, #71b280 100%)",
+    neon: "linear-gradient(135deg, #ff00cc 0%, #333399 100%)",
+    mono: "linear-gradient(135deg, #232526 0%, #414345 100%)",
+    ember: "radial-gradient(circle at 30% 30%, #ff512f 0%, #dd2476 100%)",
+    ocean: "linear-gradient(135deg, #2b5876 0%, #4e4376 100%)",
+    blood: "linear-gradient(135deg, #200122 0%, #6f0000 100%)",
+  };
+
+  function applyBackground(bg) {
+    const b = document.body.style;
+    b.backgroundImage = "";
+    b.backgroundColor = "transparent";
+    b.backgroundSize = "";
+    b.backgroundRepeat = "";
+    b.backgroundPosition = "";
+    if (!bg || bg.kind === "none" || !bg.kind) return;
+    if (bg.kind === "color") {
+      b.backgroundColor = bg.value || "transparent";
+      return;
+    }
+    if (bg.kind === "preset") {
+      const css = BG_PRESETS[bg.value];
+      if (css) {
+        b.backgroundImage = css;
+        b.backgroundSize = "cover";
+      }
+      return;
+    }
+    if (bg.kind === "image" && bg.value) {
+      b.backgroundImage = `url("${bg.value.replace(/"/g, '\\"')}")`;
+      const fit = bg.fit || "cover";
+      if (fit === "tile") {
+        b.backgroundRepeat = "repeat";
+        b.backgroundSize = "auto";
+      } else {
+        b.backgroundRepeat = "no-repeat";
+        b.backgroundPosition = "center";
+        b.backgroundSize = fit === "contain" ? "contain" : "cover";
+      }
+      return;
+    }
+  }
   let tableRows = 8;
 
   function setVar(name, val) {
@@ -272,6 +317,11 @@
     setVar("--bad", withHash(s.bad) || "#f87171");
     setVar("--muted", withHash(s.muted) || "#b8c0d4");
     setVar("--shadow", s.noShadow ? "none" : DEFAULT_SHADOW);
+
+    applyBackground(s.background);
+
+    document.documentElement.style.height = (s.background && s.background.kind && s.background.kind !== "none") ? "100%" : "";
+    document.body.style.minHeight = (s.background && s.background.kind && s.background.kind !== "none") ? "100vh" : "";
 
     const scale = parseFloat(s.scale);
     if (scale && scale !== 1) {

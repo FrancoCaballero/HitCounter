@@ -459,6 +459,54 @@ button:disabled { opacity: 0.45; cursor: not-allowed; }
   outline: none;
 }
 
+.hc-bg-modes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.hc-bg-mode {
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  color: var(--text);
+  padding: 6px 12px;
+  border-radius: 6px;
+  font-size: 12px;
+  cursor: pointer;
+}
+.hc-bg-mode:hover { background: #2a3140; }
+.hc-bg-mode.active { border-color: var(--accent); background: #25201a; }
+.hc-bg-presets {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
+  gap: 8px;
+}
+.hc-bg-preset {
+  height: 56px;
+  border-radius: 6px;
+  border: 2px solid transparent;
+  cursor: pointer;
+  position: relative;
+  display: flex;
+  align-items: flex-end;
+  padding: 4px 6px;
+  overflow: hidden;
+}
+.hc-bg-preset span {
+  font-size: 11px;
+  font-weight: 600;
+  color: #fff;
+  text-shadow: 0 1px 3px rgba(0,0,0,0.8);
+}
+.hc-bg-preset.active { border-color: var(--accent); }
+.hc-bg-thumb {
+  height: 80px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+}
+
 .hc-theme-preview {
   background:
     linear-gradient(45deg, #1a1d24 25%, transparent 25%),
