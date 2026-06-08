@@ -34,6 +34,8 @@ type RunState = {
   addSplit: (name: string) => void;
   renameSplit: (id: string, name: string) => void;
   removeSplit: (id: string) => void;
+  moveSplit: (id: string, dir: -1 | 1) => void;
+  reorderSplits: (fromId: string, toId: string) => void;
   setSplits: (splits: Split[]) => void;
   setTitle: (title: string) => void;
 };
@@ -210,6 +212,38 @@ export const useRun = create<RunState>()(
             splits: splits.length ? splits : [blankSplit("Split 1")],
             activeIdx: Math.min(s.activeIdx, Math.max(0, splits.length - 1)),
           };
+        }),
+
+      moveSplit: (id, dir) =>
+        set((s) => {
+          const idx = s.splits.findIndex((sp) => sp.id === id);
+          if (idx < 0) return s;
+          const target = idx + dir;
+          if (target < 0 || target >= s.splits.length) return s;
+          const splits = s.splits.slice();
+          [splits[idx], splits[target]] = [splits[target], splits[idx]];
+          let activeIdx = s.activeIdx;
+          if (activeIdx === idx) activeIdx = target;
+          else if (activeIdx === target) activeIdx = idx;
+          return { splits, activeIdx };
+        }),
+
+      reorderSplits: (fromId, toId) =>
+        set((s) => {
+          if (fromId === toId) return s;
+          const from = s.splits.findIndex((sp) => sp.id === fromId);
+          const to = s.splits.findIndex((sp) => sp.id === toId);
+          if (from < 0 || to < 0) return s;
+          const splits = s.splits.slice();
+          const [moved] = splits.splice(from, 1);
+          splits.splice(to, 0, moved);
+          let activeIdx = s.activeIdx;
+          const activeId = s.splits[s.activeIdx]?.id;
+          if (activeId) {
+            const newActive = splits.findIndex((sp) => sp.id === activeId);
+            if (newActive >= 0) activeIdx = newActive;
+          }
+          return { splits, activeIdx };
         }),
 
       setSplits: (splits) => set({ splits }),

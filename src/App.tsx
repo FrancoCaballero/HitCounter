@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRun, formatTime } from "./store";
 import { HotkeySettings } from "./HotkeySettings";
 import { HistoryPanel } from "./HistoryPanel";
@@ -89,6 +89,9 @@ function App() {
   const [showTpl, setShowTpl] = useState(false);
   const [showOverlay, setShowOverlay] = useState(false);
   const [showBackup, setShowBackup] = useState(false);
+  const [dragId, setDragId] = useState<string | null>(null);
+  const [dragOverId, setDragOverId] = useState<string | null>(null);
+  const dragIdRef = useRef<string | null>(null);
 
   const store = useRun.getState();
 
@@ -170,12 +173,50 @@ function App() {
           return (
             <div
               key={sp.id}
+              draggable
+              onDragStart={(e) => {
+                dragIdRef.current = sp.id;
+                setDragId(sp.id);
+                e.dataTransfer.effectAllowed = "move";
+                try { e.dataTransfer.setData("text/plain", sp.id); } catch {}
+              }}
+              onDragEnter={(e) => {
+                if (!dragIdRef.current || dragIdRef.current === sp.id) return;
+                e.preventDefault();
+                setDragOverId(sp.id);
+              }}
+              onDragOver={(e) => {
+                if (!dragIdRef.current || dragIdRef.current === sp.id) return;
+                e.preventDefault();
+                e.dataTransfer.dropEffect = "move";
+              }}
+              onDragLeave={(e) => {
+                if (e.currentTarget.contains(e.relatedTarget as Node)) return;
+                if (dragOverId === sp.id) setDragOverId(null);
+              }}
+              onDrop={(e) => {
+                e.preventDefault();
+                const from = dragIdRef.current || e.dataTransfer.getData("text/plain");
+                if (from && from !== sp.id) store.reorderSplits(from, sp.id);
+                dragIdRef.current = null;
+                setDragId(null);
+                setDragOverId(null);
+              }}
+              onDragEnd={() => {
+                dragIdRef.current = null;
+                setDragId(null);
+                setDragOverId(null);
+              }}
               className={`hc-split ${active ? "active" : ""} ${
                 i < activeIdx ? "done" : ""
+              } ${dragId === sp.id ? "dragging" : ""} ${
+                dragOverId === sp.id ? "drag-over" : ""
               }`}
             >
+              <span className="hc-drag-handle" title="Drag to reorder">⋮⋮</span>
               <input
                 className="hc-split-name"
+                draggable={false}
                 value={sp.name}
                 onChange={(e) => store.renameSplit(sp.id, e.currentTarget.value)}
               />
@@ -207,6 +248,20 @@ function App() {
                     {sp.pbTimeMs !== null ? formatTime(sp.pbTimeMs) : "—"}
                   </small>
                 </span>
+                <div className="hc-split-move">
+                  <button
+                    className="hc-move-btn"
+                    onClick={() => store.moveSplit(sp.id, -1)}
+                    disabled={i === 0}
+                    title="Move up"
+                  >▲</button>
+                  <button
+                    className="hc-move-btn"
+                    onClick={() => store.moveSplit(sp.id, 1)}
+                    disabled={i === splits.length - 1}
+                    title="Move down"
+                  >▼</button>
+                </div>
                 <button
                   className="hc-x"
                   onClick={() => store.removeSplit(sp.id)}
