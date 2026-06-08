@@ -1,0 +1,243 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Hit Counter Overlay</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@700;900&family=Orbitron:wght@700;900&family=Press+Start+2P&family=Russo+One&family=Black+Ops+One&family=Bebas+Neue&family=Audiowide&family=Creepster&family=Bungee&family=Metal+Mania&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --accent: #ffb454;
+    --good: #4ade80;
+    --bad: #f87171;
+    --muted: #b8c0d4;
+    --text: #ffffff;
+    --shadow: 0 2px 6px rgba(0,0,0,0.85), 0 0 14px rgba(0,0,0,0.6);
+    --pad: 18px;
+  }
+  html, body {
+    margin: 0;
+    padding: 0;
+    background: transparent;
+    color: var(--text);
+    font-family: ui-sans-serif, system-ui, "Segoe UI", Roboto, sans-serif;
+    font-variant-numeric: tabular-nums;
+    -webkit-font-smoothing: antialiased;
+    overflow: hidden;
+  }
+  body { padding: var(--pad); }
+  .wrap { display: inline-block; }
+  .conn-off { opacity: 0.45; }
+
+  .title {
+    font-size: 22px;
+    font-weight: 800;
+    letter-spacing: 0.5px;
+    color: var(--text);
+    text-shadow: var(--shadow);
+    margin-bottom: 6px;
+  }
+  .title:empty { display: none; }
+
+  .title.font-cinzel { font-family: "Cinzel", serif; letter-spacing: 2px; text-transform: uppercase; }
+  .title.font-orbitron { font-family: "Orbitron", sans-serif; letter-spacing: 3px; text-transform: uppercase; }
+  .title.font-pressstart { font-family: "Press Start 2P", monospace; letter-spacing: 0; font-size: 16px; }
+  .title.font-russo { font-family: "Russo One", sans-serif; letter-spacing: 1px; text-transform: uppercase; }
+  .title.font-blackops { font-family: "Black Ops One", system-ui; letter-spacing: 2px; text-transform: uppercase; }
+  .title.font-bebas { font-family: "Bebas Neue", sans-serif; letter-spacing: 3px; font-size: 28px; }
+  .title.font-audiowide { font-family: "Audiowide", sans-serif; letter-spacing: 2px; text-transform: uppercase; }
+  .title.font-creepster { font-family: "Creepster", system-ui; letter-spacing: 2px; font-size: 30px; }
+  .title.font-bungee { font-family: "Bungee", sans-serif; letter-spacing: 1px; text-transform: uppercase; }
+  .title.font-metal { font-family: "Metal Mania", system-ui; letter-spacing: 2px; font-size: 30px; }
+
+  .hits {
+    font-size: 84px;
+    font-weight: 900;
+    color: var(--accent);
+    line-height: 1;
+    text-shadow: var(--shadow);
+  }
+  .timer {
+    font-size: 40px;
+    font-weight: 800;
+    text-shadow: var(--shadow);
+    letter-spacing: 1px;
+  }
+  .pb { color: var(--muted); font-size: 15px; text-shadow: var(--shadow); }
+  .split {
+    margin-top: 8px;
+    font-size: 18px;
+    font-weight: 700;
+    text-shadow: var(--shadow);
+  }
+  .split .name { color: var(--text); }
+  .split .sub  { color: var(--muted); font-weight: 500; margin-left: 8px; font-size: 14px; }
+  .delta.good { color: var(--good); }
+  .delta.bad  { color: var(--bad); }
+
+  /* === default theme === */
+  body.theme-default .row { display: flex; align-items: center; gap: 22px; }
+  body.theme-default .meta { display: flex; flex-direction: column; gap: 4px; }
+
+  body.theme-compact .title { font-size: 14px; margin-bottom: 2px; }
+  body.theme-hits .title { font-size: 26px; margin-bottom: 8px; }
+  body.theme-minimal .title { font-size: 12px; margin-bottom: 2px; }
+  body.theme-vertical .title { font-size: 28px; }
+  body.theme-bigsplit .title { font-size: 20px; }
+
+  /* === compact: HITS · TIME in one line === */
+  body.theme-compact .row {
+    display: flex;
+    align-items: baseline;
+    gap: 14px;
+  }
+  body.theme-compact .hits { font-size: 48px; }
+  body.theme-compact .timer { font-size: 28px; color: var(--text); }
+  body.theme-compact .pb { display: none; }
+  body.theme-compact .split { display: none; }
+
+  /* === vertical: stacked === */
+  body.theme-vertical .row {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 4px;
+  }
+  body.theme-vertical .hits { font-size: 96px; }
+  body.theme-vertical .timer { font-size: 32px; }
+  body.theme-vertical .meta { order: 2; }
+
+  /* === hits-only: just the number === */
+  body.theme-hits .timer,
+  body.theme-hits .pb,
+  body.theme-hits .split { display: none; }
+  body.theme-hits .hits { font-size: 140px; }
+  body.theme-hits .row { display: block; }
+
+  /* === minimal: small text everything === */
+  body.theme-minimal .row { display: flex; align-items: baseline; gap: 12px; }
+  body.theme-minimal .hits { font-size: 28px; }
+  body.theme-minimal .timer { font-size: 20px; }
+  body.theme-minimal .pb { font-size: 11px; }
+  body.theme-minimal .split { font-size: 12px; margin-top: 4px; }
+  body.theme-minimal .split .sub { font-size: 11px; }
+
+  /* === bigsplit: highlight current split === */
+  body.theme-bigsplit .row { display: flex; align-items: center; gap: 18px; }
+  body.theme-bigsplit .hits { font-size: 64px; }
+  body.theme-bigsplit .timer { font-size: 30px; }
+  body.theme-bigsplit .split { font-size: 26px; margin-top: 10px; }
+  body.theme-bigsplit .split .sub { font-size: 16px; }
+</style>
+</head>
+<body>
+<div class="wrap" id="root">
+  <div class="title" id="title"></div>
+  <div class="row">
+    <div class="hits" id="hits">0</div>
+    <div class="meta">
+      <div class="timer" id="timer">00:00.00</div>
+      <div class="pb" id="pb">PB: — · Best Hits: —</div>
+    </div>
+  </div>
+  <div class="split" id="split"></div>
+</div>
+<script>
+  const params = new URLSearchParams(location.search);
+  const theme = (params.get("theme") || "default").toLowerCase();
+  const valid = ["default", "compact", "vertical", "hits", "minimal", "bigsplit"];
+  document.body.className = "theme-" + (valid.includes(theme) ? theme : "default");
+
+  const titleFont = (params.get("titlefont") || "").toLowerCase();
+  const validFonts = ["cinzel","orbitron","pressstart","russo","blackops","bebas","audiowide","creepster","bungee","metal"];
+  if (validFonts.includes(titleFont)) {
+    document.getElementById("title").classList.add("font-" + titleFont);
+  }
+
+  function setVar(name, val) {
+    if (val) document.documentElement.style.setProperty(name, val);
+  }
+  setVar("--accent", params.get("accent") && "#" + params.get("accent"));
+  setVar("--text", params.get("text") && "#" + params.get("text"));
+  setVar("--good", params.get("good") && "#" + params.get("good"));
+  setVar("--bad", params.get("bad") && "#" + params.get("bad"));
+  setVar("--muted", params.get("muted") && "#" + params.get("muted"));
+  const scale = parseFloat(params.get("scale") || "1");
+  if (scale && scale !== 1) {
+    document.body.style.transform = `scale(${scale})`;
+    document.body.style.transformOrigin = "top left";
+  }
+  if (params.get("noshadow") === "1") {
+    setVar("--shadow", "none");
+  }
+
+  const $ = (id) => document.getElementById(id);
+  const fmt = (ms) => {
+    const t = Math.max(0, Math.floor(ms));
+    const h = Math.floor(t / 3600000);
+    const m = Math.floor((t % 3600000) / 60000);
+    const s = Math.floor((t % 60000) / 1000);
+    const cs = Math.floor((t % 1000) / 10);
+    const p = (n, w=2) => String(n).padStart(w, "0");
+    return h > 0 ? `${h}:${p(m)}:${p(s)}.${p(cs)}` : `${p(m)}:${p(s)}.${p(cs)}`;
+  };
+
+  let state = null;
+
+  function render() {
+    if (!state) return;
+    $("title").textContent = state.title ?? "";
+    $("hits").textContent = state.totalHits ?? 0;
+
+    let runMs = state.runElapsedMs ?? 0;
+    if (state.isRunning) runMs = (state.runElapsedMs ?? 0) + (Date.now() - state.tsMs);
+    $("timer").textContent = fmt(runMs);
+
+    const pbT = state.totalPbTimeMs;
+    const pbH = state.totalPbHits;
+    $("pb").textContent = `PB: ${pbT != null ? fmt(pbT) : "—"} · Best Hits: ${pbH ?? "—"}`;
+
+    const sp = state.activeSplit;
+    if (sp) {
+      let splitMs = sp.timeMs ?? 0;
+      if (state.isRunning) splitMs += Date.now() - state.tsMs;
+      const delta = sp.pbHits != null ? sp.hits - sp.pbHits : null;
+      const dCls = delta == null ? "" : delta < 0 ? "good" : delta > 0 ? "bad" : "";
+      const dTxt = delta == null ? "" : delta > 0 ? `+${delta}` : delta;
+      $("split").innerHTML = `
+        <span class="name">${escapeHtml(sp.name ?? "")}</span>
+        <span class="sub">${sp.hits ?? 0} hits${sp.pbHits != null ? ` / PB ${sp.pbHits}` : ""} <span class="delta ${dCls}">${dTxt}</span></span>
+        <span class="sub">${fmt(splitMs)}${sp.pbTimeMs != null ? ` / ${fmt(sp.pbTimeMs)}` : ""}</span>
+      `;
+    } else {
+      $("split").textContent = "";
+    }
+  }
+
+  function escapeHtml(s) {
+    return String(s).replace(/[&<>"']/g, (c) => ({
+      "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
+    })[c]);
+  }
+
+  function connect() {
+    const ws = new WebSocket(`ws://${location.host}/ws`);
+    ws.onmessage = (e) => {
+      try {
+        state = JSON.parse(e.data);
+        document.getElementById("root").classList.remove("conn-off");
+        render();
+      } catch {}
+    };
+    ws.onclose = () => {
+      document.getElementById("root").classList.add("conn-off");
+      setTimeout(connect, 1000);
+    };
+    ws.onerror = () => ws.close();
+  }
+  connect();
+  setInterval(render, 33);
+</script>
+</body>
+</html>
