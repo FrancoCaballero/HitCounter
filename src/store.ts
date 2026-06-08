@@ -8,6 +8,7 @@ export type Split = {
   timeMs: number;
   pbHits: number | null;
   pbTimeMs: number | null;
+  done?: boolean;
 };
 
 type RunState = {
@@ -38,6 +39,8 @@ type RunState = {
   reorderSplits: (fromId: string, toId: string) => void;
   setSplits: (splits: Split[]) => void;
   setTitle: (title: string) => void;
+  toggleSplitDone: (id: string) => void;
+  jumpToSplit: (id: string) => void;
 };
 
 const blankSplit = (name: string): Split => ({
@@ -67,7 +70,12 @@ export const useRun = create<RunState>()(
       startRun: () => {
         const now = performance.now();
         set((s) => ({
-          splits: s.splits.map((sp) => ({ ...sp, hits: 0, timeMs: 0 })),
+          splits: s.splits.map((sp) => ({
+            ...sp,
+            hits: 0,
+            timeMs: 0,
+            done: false,
+          })),
           activeIdx: 0,
           totalHits: 0,
           runStartedAt: now,
@@ -103,7 +111,7 @@ export const useRun = create<RunState>()(
 
       resetRun: () => {
         set((s) => ({
-          splits: s.splits.map((sp) => ({ ...sp, hits: 0, timeMs: 0 })),
+          splits: s.splits.map((sp) => ({ ...sp, hits: 0, timeMs: 0, done: false })),
           activeIdx: 0,
           totalHits: 0,
           runStartedAt: null,
@@ -143,7 +151,9 @@ export const useRun = create<RunState>()(
         const now = performance.now();
         const splitElapsed = now - (s.splitStartedAt ?? now);
         const splits = s.splits.map((sp, i) =>
-          i === s.activeIdx ? { ...sp, timeMs: sp.timeMs + splitElapsed } : sp
+          i === s.activeIdx
+            ? { ...sp, timeMs: sp.timeMs + splitElapsed, done: true }
+            : sp
         );
         if (s.activeIdx >= s.splits.length - 1) {
           get().finishRun();
@@ -173,7 +183,7 @@ export const useRun = create<RunState>()(
             sp.pbTimeMs === null || sp.timeMs < sp.pbTimeMs
               ? sp.timeMs
               : sp.pbTimeMs;
-          return { ...sp, pbHits: newPbHits, pbTimeMs: newPbTime };
+          return { ...sp, pbHits: newPbHits, pbTimeMs: newPbTime, done: true };
         });
 
         const newTotalPbHits =
@@ -249,6 +259,35 @@ export const useRun = create<RunState>()(
       setSplits: (splits) => set({ splits }),
 
       setTitle: (title) => set({ title }),
+
+      toggleSplitDone: (id) =>
+        set((s) => ({
+          splits: s.splits.map((sp) =>
+            sp.id === id ? { ...sp, done: !sp.done } : sp
+          ),
+        })),
+
+      jumpToSplit: (id) =>
+        set((s) => {
+          const idx = s.splits.findIndex((sp) => sp.id === id);
+          if (idx < 0) return s;
+          const now = performance.now();
+          // accumulate elapsed on currently active split before jumping
+          let splits = s.splits.slice();
+          if (s.isRunning && s.splitStartedAt !== null) {
+            const elapsed = now - s.splitStartedAt;
+            splits = splits.map((sp, i) =>
+              i === s.activeIdx ? { ...sp, timeMs: sp.timeMs + elapsed } : sp
+            );
+          }
+          splits = splits.map((sp, i) => ({ ...sp, done: i < idx }));
+          return {
+            splits,
+            activeIdx: idx,
+            splitStartedAt: s.isRunning ? now : s.splitStartedAt,
+            isFinished: false,
+          };
+        }),
     }),
     {
       name: "hitcounter-run",

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   Multirun,
   SubrunSnapshot,
@@ -7,6 +7,7 @@ import {
   useMultirun,
 } from "./multirun";
 import { BUILTIN_TEMPLATES, Template, useTemplates } from "./templates";
+import { confirmDialog } from "./Confirm";
 
 export function MultirunPanel({ onClose }: { onClose: () => void }) {
   const multiruns = useMultirun((s) => s.multiruns);
@@ -21,6 +22,7 @@ export function MultirunPanel({ onClose }: { onClose: () => void }) {
   const renameSubrun = useMultirun((s) => s.renameSubrun);
   const toggleSubrunCompleted = useMultirun((s) => s.toggleSubrunCompleted);
   const moveSubrun = useMultirun((s) => s.moveSubrun);
+  const duplicateSubrun = useMultirun((s) => s.duplicateSubrun);
   const selectSubrun = useMultirun((s) => s.selectSubrun);
   const clearActive = useMultirun((s) => s.clearActive);
 
@@ -29,6 +31,24 @@ export function MultirunPanel({ onClose }: { onClose: () => void }) {
 
   const [newTitle, setNewTitle] = useState("");
   const [newRuns, setNewRuns] = useState("");
+  const [flashId, setFlashId] = useState<string | null>(null);
+  const [toast, setToast] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!flashId) return;
+    const el = document.querySelector(
+      `[data-subrun-id="${flashId}"]`
+    ) as HTMLElement | null;
+    if (el) el.scrollIntoView({ behavior: "smooth", block: "center" });
+    const t = setTimeout(() => setFlashId(null), 1800);
+    return () => clearTimeout(t);
+  }, [flashId]);
+
+  useEffect(() => {
+    if (!toast) return;
+    const t = setTimeout(() => setToast(null), 1800);
+    return () => clearTimeout(t);
+  }, [toast]);
   const [draftRuns, setDraftRuns] = useState<
     { name: string; snapshot: SubrunSnapshot | null }[]
   >([]);
@@ -212,9 +232,14 @@ export function MultirunPanel({ onClose }: { onClose: () => void }) {
                     isActiveMultirun={m.id === activeMultirunId}
                     activeSubrunId={activeSubrunId}
                     onRenameMultirun={(t) => renameMultirun(m.id, t)}
-                    onRemoveMultirun={() => {
-                      if (confirm(`Delete multirun "${m.title}"?`))
-                        removeMultirun(m.id);
+                    onRemoveMultirun={async () => {
+                      const ok = await confirmDialog({
+                        title: "Delete multirun",
+                        message: `Delete multirun "${m.title}"?`,
+                        confirmText: "Delete",
+                        danger: true,
+                      });
+                      if (ok) removeMultirun(m.id);
                     }}
                     onAddSubrun={(name, snap) => addSubrun(m.id, name, snap)}
                     templates={allTemplates}
@@ -223,6 +248,14 @@ export function MultirunPanel({ onClose }: { onClose: () => void }) {
                     onRenameSubrun={(sId, name) => renameSubrun(m.id, sId, name)}
                     onToggleCompleted={(sId) => toggleSubrunCompleted(m.id, sId)}
                     onMoveSubrun={(sId, dir) => moveSubrun(m.id, sId, dir)}
+                    onDuplicateSubrun={(sId) => {
+                      const newId = duplicateSubrun(m.id, sId);
+                      if (newId) {
+                        setFlashId(newId);
+                        setToast("Run duplicated");
+                      }
+                    }}
+                    flashSubrunId={flashId}
                     onSelectSubrun={(sId) => {
                       selectSubrun(m.id, sId);
                       onClose();
@@ -240,6 +273,28 @@ export function MultirunPanel({ onClose }: { onClose: () => void }) {
           )}
           <button onClick={onClose}>Close</button>
         </div>
+
+        {toast && (
+          <div
+            style={{
+              position: "absolute",
+              bottom: 20,
+              left: "50%",
+              transform: "translateX(-50%)",
+              background: "var(--accent)",
+              color: "#000",
+              padding: "8px 16px",
+              borderRadius: 999,
+              fontWeight: 700,
+              fontSize: 13,
+              boxShadow: "0 4px 14px rgba(0,0,0,0.4)",
+              pointerEvents: "none",
+              zIndex: 10,
+            }}
+          >
+            {toast}
+          </div>
+        )}
       </div>
     </div>
   );
@@ -258,6 +313,8 @@ function MultirunCard({
   onRenameSubrun,
   onToggleCompleted,
   onMoveSubrun,
+  onDuplicateSubrun,
+  flashSubrunId,
   onSelectSubrun,
 }: {
   m: Multirun;
@@ -272,6 +329,8 @@ function MultirunCard({
   onRenameSubrun: (sId: string, name: string) => void;
   onToggleCompleted: (sId: string) => void;
   onMoveSubrun: (sId: string, dir: -1 | 1) => void;
+  onDuplicateSubrun: (sId: string) => void;
+  flashSubrunId: string | null;
   onSelectSubrun: (sId: string) => void;
 }) {
   const [editingTitle, setEditingTitle] = useState(false);
@@ -333,14 +392,24 @@ function MultirunCard({
           return (
             <div
               key={r.id}
+              data-subrun-id={r.id}
               style={{
                 display: "flex",
                 alignItems: "center",
                 gap: 8,
                 padding: "6px 8px",
-                background: isActiveSub ? "var(--panel-2)" : "transparent",
-                border: "1px solid var(--border)",
+                background:
+                  flashSubrunId === r.id
+                    ? "rgba(255,180,84,0.25)"
+                    : isActiveSub
+                    ? "var(--panel-2)"
+                    : "transparent",
+                border:
+                  flashSubrunId === r.id
+                    ? "2px solid var(--accent)"
+                    : "1px solid var(--border)",
                 borderRadius: 6,
+                transition: "background 0.3s ease, border-color 0.3s ease",
               }}
             >
               <input
@@ -368,6 +437,10 @@ function MultirunCard({
                   title="Move down"
                 >▼</button>
                 <button
+                  onClick={() => onDuplicateSubrun(r.id)}
+                  title="Duplicate this run"
+                >Copy</button>
+                <button
                   onClick={() => onSelectSubrun(r.id)}
                   disabled={isActiveSub}
                   title="Load this run"
@@ -376,8 +449,14 @@ function MultirunCard({
                 </button>
                 <button
                   className="hc-x"
-                  onClick={() => {
-                    if (confirm(`Remove run "${r.name}"?`)) onRemoveSubrun(r.id);
+                  onClick={async () => {
+                    const ok = await confirmDialog({
+                      title: "Remove run",
+                      message: `Remove run "${r.name}"?`,
+                      confirmText: "Remove",
+                      danger: true,
+                    });
+                    if (ok) onRemoveSubrun(r.id);
                   }}
                   title="Remove run"
                 >×</button>

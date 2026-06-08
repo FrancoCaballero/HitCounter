@@ -7,6 +7,7 @@ import { OverlayPanel } from "./OverlayPanel";
 import { BackupPanel } from "./BackupPanel";
 import { MultirunPanel } from "./MultirunPanel";
 import { useMultirun } from "./multirun";
+import { ConfirmHost } from "./Confirm";
 import "./App.css";
 
 function useTimerTick() {
@@ -378,6 +379,34 @@ function App() {
                     title="Move down"
                   >▼</button>
                 </div>
+                {(() => {
+                  const isCurrent = i === activeIdx && isRunning;
+                  const isDone = !!sp.done;
+                  const mark = isDone ? "✓" : isCurrent ? "▶" : "○";
+                  const color = isDone
+                    ? "#d4af37"
+                    : isCurrent
+                    ? "var(--accent)"
+                    : "rgba(255,255,255,0.35)";
+                  return (
+                    <button
+                      onClick={() => store.jumpToSplit(sp.id)}
+                      title="Jump to this split (marks previous as done)"
+                      style={{
+                        background: "transparent",
+                        border: "none",
+                        cursor: "pointer",
+                        fontWeight: 800,
+                        fontSize: 18,
+                        color,
+                        padding: "4px 8px",
+                        userSelect: "none",
+                      }}
+                    >
+                      {mark}
+                    </button>
+                  );
+                })()}
                 <button
                   className="hc-x"
                   onClick={() => store.removeSplit(sp.id)}
@@ -397,6 +426,7 @@ function App() {
       {showOverlay && <OverlayPanel onClose={() => setShowOverlay(false)} />}
       {showBackup && <BackupPanel onClose={() => setShowBackup(false)} />}
       {showMulti && <MultirunPanel onClose={() => setShowMulti(false)} />}
+      <ConfirmHost />
     </main>
   );
 }

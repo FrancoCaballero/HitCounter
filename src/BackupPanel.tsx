@@ -6,6 +6,7 @@ import {
   wipeAll,
   ImportOpts,
 } from "./backup";
+import { confirmDialog } from "./Confirm";
 
 export function BackupPanel({ onClose }: { onClose: () => void }) {
   const [pasted, setPasted] = useState("");
@@ -117,10 +118,15 @@ export function BackupPanel({ onClose }: { onClose: () => void }) {
           <div className="hc-bk-actions">
             <button
               className="hc-danger"
-              onClick={() => {
-                if (
-                  confirm("Wipe ALL local data (splits, PBs, history, templates)?")
-                ) {
+              onClick={async () => {
+                const ok = await confirmDialog({
+                  title: "Wipe all data",
+                  message:
+                    "Wipe ALL local data (splits, PBs, history, templates)? Cannot undo.",
+                  confirmText: "Wipe all",
+                  danger: true,
+                });
+                if (ok) {
                   wipeAll();
                   setStatus("All data wiped.");
                 }

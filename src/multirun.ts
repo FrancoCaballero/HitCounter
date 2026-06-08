@@ -31,6 +31,7 @@ type MultirunState = {
   renameMultirun: (id: string, title: string) => void;
   addSubrun: (mId: string, name: string, snapshot?: SubrunSnapshot) => void;
   removeSubrun: (mId: string, sId: string) => void;
+  duplicateSubrun: (mId: string, sId: string) => string | null;
   renameSubrun: (mId: string, sId: string, name: string) => void;
   toggleSubrunCompleted: (mId: string, sId: string) => void;
   moveSubrun: (mId: string, sId: string, dir: -1 | 1) => void;
@@ -155,6 +156,40 @@ export const useMultirun = create<MultirunState>()(
               : m
           ),
         })),
+
+      duplicateSubrun: (mId, sId) => {
+        const s = get();
+        const m = s.multiruns.find((x) => x.id === mId);
+        const idx = m?.runs.findIndex((r) => r.id === sId) ?? -1;
+        if (!m || idx < 0) return null;
+        const orig = m.runs[idx];
+        const copy: Subrun = {
+          id: crypto.randomUUID(),
+          name: `${orig.name} (copy)`,
+          completed: false,
+          snapshot: orig.snapshot
+            ? {
+                splits: orig.snapshot.splits.map((sp) => ({
+                  ...sp,
+                  id: crypto.randomUUID(),
+                  hits: 0,
+                  timeMs: 0,
+                })),
+                totalPbHits: orig.snapshot.totalPbHits,
+                totalPbTimeMs: orig.snapshot.totalPbTimeMs,
+              }
+            : null,
+        };
+        set({
+          multiruns: s.multiruns.map((mm) => {
+            if (mm.id !== mId) return mm;
+            const runs = mm.runs.slice();
+            runs.splice(idx + 1, 0, copy);
+            return { ...mm, runs };
+          }),
+        });
+        return copy.id;
+      },
 
       removeSubrun: (mId, sId) =>
         set((s) => ({

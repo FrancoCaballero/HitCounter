@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import { useHistory, computeStats, exportHistoryJson, RunEntry } from "./history";
 import { formatTime } from "./store";
+import { confirmDialog } from "./Confirm";
 
 function fmtDate(ms: number) {
   const d = new Date(ms);
@@ -67,7 +68,12 @@ export function HistoryPanel({ onClose }: { onClose: () => void }) {
           <button onClick={downloadJson} disabled={runs.length === 0}>Download JSON</button>
           <button
             onClick={() => {
-              if (confirm("Delete ALL history? Cannot undo.")) clear();
+              confirmDialog({
+                title: "Delete history",
+                message: "Delete ALL history? Cannot undo.",
+                confirmText: "Delete",
+                danger: true,
+              }).then((ok) => { if (ok) clear(); });
             }}
             disabled={runs.length === 0}
           >
