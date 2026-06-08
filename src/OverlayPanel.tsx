@@ -199,6 +199,10 @@ export function OverlayPanel({ onClose }: { onClose: () => void }) {
               <input type="checkbox" checked={show.activeSplit} onChange={() => toggle("activeSplit")} />
               <span>Active split</span>
             </label>
+            <label className="hc-theme-check">
+              <input type="checkbox" checked={show.multirun} onChange={() => toggle("multirun")} />
+              <span>Multirun strip</span>
+            </label>
           </div>
           {theme === "table" && (
             <>

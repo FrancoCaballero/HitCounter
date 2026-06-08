@@ -194,6 +194,47 @@
   body.hide-col-time .splits-table .col-time { display: none; }
   body.hide-col-pb .splits-table .col-pb { display: none; }
 
+  /* === multirun strip === */
+  .multirun {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 10px;
+    text-shadow: var(--shadow);
+  }
+  .multirun:empty { display: none; }
+  .multirun .mr-title {
+    font-size: 20px;
+    font-weight: 800;
+    letter-spacing: 1px;
+    color: var(--text);
+    text-align: center;
+  }
+  .multirun .mr-chips {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 14px;
+    font-size: 16px;
+    font-weight: 700;
+  }
+  .multirun .mr-chip {
+    color: rgba(255,255,255,0.28);
+    transition: color 0.15s ease;
+  }
+  .multirun .mr-chip.done {
+    color: #d4af37;
+  }
+  .multirun .mr-chip.active {
+    color: #ffffff;
+  }
+  .multirun .mr-chip.active.done {
+    color: #d4af37;
+  }
+  body.hide-multirun .multirun { display: none !important; }
+  body.has-multirun .title { display: none !important; }
+
   /* === bigsplit: highlight current split === */
   body.theme-bigsplit .row { display: flex; align-items: center; gap: 18px; }
   body.theme-bigsplit .hits { font-size: 64px; }
@@ -204,6 +245,7 @@
 </head>
 <body>
 <div class="wrap" id="root">
+  <div class="multirun" id="multirun"></div>
   <div class="title" id="title"></div>
   <div class="row">
     <div class="hits" id="hits">0</div>
@@ -296,6 +338,7 @@
     if (!flag("totalTimer", true)) cls.push("hide-totaltimer");
     if (!flag("totalPb", true)) cls.push("hide-totalpb");
     if (!flag("activeSplit", true)) cls.push("hide-activesplit");
+    if (!flag("multirun", true)) cls.push("hide-multirun");
     if (!flag("tableTotals", true)) cls.push("hide-tabletotals");
     if (!flag("colHits", true)) cls.push("hide-col-hits");
     if (!flag("colDelta", true)) cls.push("hide-col-delta");
@@ -413,8 +456,27 @@
     $("totTime").textContent = fmt(runMs);
   }
 
+  function renderMultirun() {
+    const el = $("multirun");
+    const mr = state && state.multirun;
+    if (!mr || !Array.isArray(mr.runs) || mr.runs.length === 0) {
+      el.innerHTML = "";
+      document.body.classList.remove("has-multirun");
+      return;
+    }
+    const chips = mr.runs.map((r) => {
+      const cls = ["mr-chip"];
+      if (r.completed) cls.push("done");
+      if (r.active) cls.push("active");
+      return `<span class="${cls.join(" ")}">${escapeHtml(r.name || "")}</span>`;
+    }).join("");
+    el.innerHTML = `<div class="mr-title">${escapeHtml(mr.title || "")}</div><div class="mr-chips">${chips}</div>`;
+    document.body.classList.add("has-multirun");
+  }
+
   function render() {
     if (!state) return;
+    renderMultirun();
     const isTable = document.body.classList.contains("theme-table");
     $("splitsTable").style.display = isTable ? "" : "none";
     $("splitsTotals").style.display = isTable ? "" : "none";

@@ -1,5 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import { useRun } from "./store";
+import { useMultirun } from "./multirun";
 
 type SplitRow = {
   name: string;
@@ -8,6 +9,9 @@ type SplitRow = {
   pbHits: number | null;
   pbTimeMs: number | null;
 };
+
+type MultirunSubInfo = { name: string; completed: boolean; active: boolean };
+type MultirunInfo = { title: string; runs: MultirunSubInfo[] } | null;
 
 type Snapshot = {
   tsMs: number;
@@ -21,6 +25,7 @@ type Snapshot = {
   activeIdx: number;
   splits: SplitRow[];
   activeSplit: SplitRow | null;
+  multirun: MultirunInfo;
 };
 
 function snapshot(): Snapshot {
@@ -44,6 +49,18 @@ function snapshot(): Snapshot {
     pbHits: row.pbHits,
     pbTimeMs: row.pbTimeMs,
   }));
+  const mr = useMultirun.getState();
+  const activeM = mr.multiruns.find((m) => m.id === mr.activeMultirunId) || null;
+  const multirun: MultirunInfo = activeM
+    ? {
+        title: activeM.title,
+        runs: activeM.runs.map((r) => ({
+          name: r.name,
+          completed: r.completed,
+          active: r.id === mr.activeSubrunId,
+        })),
+      }
+    : null;
   return {
     tsMs: Date.now(),
     title: s.title,
@@ -64,6 +81,7 @@ function snapshot(): Snapshot {
           pbTimeMs: sp.pbTimeMs,
         }
       : null,
+    multirun,
   };
 }
 
@@ -81,6 +99,7 @@ export function startSync() {
   push();
   pushStyle(loadStyle());
   useRun.subscribe(() => push());
+  useMultirun.subscribe(() => push());
   // Frequent push while running to keep timer fresh on (re)connect.
   setInterval(() => {
     if (useRun.getState().isRunning) {
@@ -140,6 +159,7 @@ export type OverlayStyle = {
     colTime: boolean;
     colPb: boolean;
     tableTotals: boolean;
+    multirun: boolean;
   };
 };
 
@@ -163,6 +183,7 @@ export const DEFAULT_STYLE: OverlayStyle = {
     colTime: true,
     colPb: true,
     tableTotals: true,
+    multirun: true,
   },
 };
 

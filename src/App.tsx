@@ -5,6 +5,8 @@ import { HistoryPanel } from "./HistoryPanel";
 import { TemplatesPanel } from "./TemplatesPanel";
 import { OverlayPanel } from "./OverlayPanel";
 import { BackupPanel } from "./BackupPanel";
+import { MultirunPanel } from "./MultirunPanel";
+import { useMultirun } from "./multirun";
 import "./App.css";
 
 function useTimerTick() {
@@ -89,6 +91,12 @@ function App() {
   const [showTpl, setShowTpl] = useState(false);
   const [showOverlay, setShowOverlay] = useState(false);
   const [showBackup, setShowBackup] = useState(false);
+  const [showMulti, setShowMulti] = useState(false);
+  const activeMultirunId = useMultirun((s) => s.activeMultirunId);
+  const activeSubrunId = useMultirun((s) => s.activeSubrunId);
+  const multiruns = useMultirun((s) => s.multiruns);
+  const activeMultirun = multiruns.find((m) => m.id === activeMultirunId) || null;
+  const activeSubrun = activeMultirun?.runs.find((r) => r.id === activeSubrunId) || null;
   const [dragId, setDragId] = useState<string | null>(null);
   const [dragOverId, setDragOverId] = useState<string | null>(null);
   const dragIdRef = useRef<string | null>(null);
@@ -140,7 +148,97 @@ function App() {
         <button onClick={() => setShowHist(true)}>History</button>
         <button onClick={() => setShowTpl(true)}>Templates</button>
         <button onClick={() => setShowBackup(true)}>Backup</button>
+        <button onClick={() => setShowMulti(true)}>
+          Multirun{activeMultirun ? " ●" : ""}
+        </button>
       </section>
+
+      {activeMultirun && (
+        <section
+          style={{
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            gap: 10,
+            padding: "12px 16px",
+            background: "var(--panel)",
+            border: "1px solid var(--border)",
+            borderRadius: 10,
+            flexShrink: 0,
+          }}
+        >
+          <div
+            style={{
+              fontSize: 22,
+              fontWeight: 700,
+              letterSpacing: 0.3,
+              textAlign: "center",
+            }}
+          >
+            {activeMultirun.title}
+          </div>
+          <div
+            style={{
+              display: "flex",
+              flexWrap: "wrap",
+              justifyContent: "center",
+              gap: 8,
+            }}
+          >
+            {activeMultirun.runs.map((r) => {
+              const isActive = r.id === activeSubrun?.id;
+              const done = r.completed;
+              return (
+                <div
+                  key={r.id}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 6,
+                    padding: "6px 12px",
+                    borderRadius: 999,
+                    border: isActive
+                      ? "2px solid var(--accent)"
+                      : done
+                      ? "1px solid var(--good)"
+                      : "1px solid var(--border)",
+                    background: done
+                      ? "rgba(74, 222, 128, 0.15)"
+                      : "var(--panel-2)",
+                    color: done ? "var(--good)" : "var(--muted)",
+                    fontWeight: done ? 700 : 500,
+                    opacity: done ? 1 : 0.7,
+                    transition: "all 0.15s ease",
+                  }}
+                >
+                  <input
+                    type="checkbox"
+                    checked={done}
+                    onChange={() =>
+                      useMultirun
+                        .getState()
+                        .toggleSubrunCompleted(activeMultirun.id, r.id)
+                    }
+                    style={{ cursor: "pointer", margin: 0 }}
+                    title="Mark complete"
+                  />
+                  <span
+                    onClick={() =>
+                      useMultirun
+                        .getState()
+                        .selectSubrun(activeMultirun.id, r.id)
+                    }
+                    style={{ cursor: "pointer", userSelect: "none" }}
+                    title="Load this run"
+                  >
+                    {r.name}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        </section>
+      )}
 
       <section className="hc-add hc-add-top">
         <input
@@ -280,6 +378,7 @@ function App() {
       {showTpl && <TemplatesPanel onClose={() => setShowTpl(false)} />}
       {showOverlay && <OverlayPanel onClose={() => setShowOverlay(false)} />}
       {showBackup && <BackupPanel onClose={() => setShowBackup(false)} />}
+      {showMulti && <MultirunPanel onClose={() => setShowMulti(false)} />}
     </main>
   );
 }
