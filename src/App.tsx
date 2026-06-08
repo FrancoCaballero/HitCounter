@@ -105,8 +105,8 @@ function App() {
         <div className="hc-timer">
           <div className="hc-time-main">{formatTime(runMs)}</div>
           <div className="hc-time-sub">
-            PB: {totalPbTimeMs !== null ? formatTime(totalPbTimeMs) : "—"} · Best Hits:{" "}
-            {totalPbHits ?? "—"}
+            PB: {totalPbHits ?? "—"} · PB time:{" "}
+            {totalPbTimeMs !== null ? formatTime(totalPbTimeMs) : "—"}
           </div>
         </div>
         <div className="hc-hits">

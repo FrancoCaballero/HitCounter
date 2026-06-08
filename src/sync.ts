@@ -105,6 +105,7 @@ export type OverlayStyle = {
   scale: number;
   noShadow: boolean;
   titleFont: string;
+  tableRows: number;
   show: {
     title: boolean;
     totalHits: boolean;
@@ -126,6 +127,7 @@ export const DEFAULT_STYLE: OverlayStyle = {
   scale: 1,
   noShadow: false,
   titleFont: "",
+  tableRows: 8,
   show: {
     title: true,
     totalHits: true,

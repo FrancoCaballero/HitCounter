@@ -39,6 +39,7 @@ export function OverlayPanel({ onClose }: { onClose: () => void }) {
   const [scale, setScale] = useState(initial.scale);
   const [noShadow, setNoShadow] = useState(initial.noShadow);
   const [titleFont, setTitleFont] = useState(initial.titleFont);
+  const [tableRows, setTableRows] = useState(initial.tableRows);
   const [show, setShow] = useState(initial.show);
   const [base, setBase] = useState("http://localhost:17800/");
   const debounceRef = useRef<number | null>(null);
@@ -47,7 +48,7 @@ export function OverlayPanel({ onClose }: { onClose: () => void }) {
     getOverlayUrl().then(setBase);
   }, []);
 
-  const style: OverlayStyle = { theme, accent, text, scale, noShadow, titleFont, show };
+  const style: OverlayStyle = { theme, accent, text, scale, noShadow, titleFont, tableRows, show };
 
   useEffect(() => {
     if (debounceRef.current !== null) window.clearTimeout(debounceRef.current);
@@ -57,7 +58,7 @@ export function OverlayPanel({ onClose }: { onClose: () => void }) {
     return () => {
       if (debounceRef.current !== null) window.clearTimeout(debounceRef.current);
     };
-  }, [theme, accent, text, scale, noShadow, titleFont, show]);
+  }, [theme, accent, text, scale, noShadow, titleFont, tableRows, show]);
 
   function toggle(key: keyof OverlayStyle["show"]) {
     setShow((s) => ({ ...s, [key]: !s[key] }));
@@ -74,6 +75,7 @@ export function OverlayPanel({ onClose }: { onClose: () => void }) {
     setScale(DEFAULT_STYLE.scale);
     setNoShadow(DEFAULT_STYLE.noShadow);
     setTitleFont(DEFAULT_STYLE.titleFont);
+    setTableRows(DEFAULT_STYLE.tableRows);
     setShow({ ...DEFAULT_STYLE.show });
   }
 
@@ -180,6 +182,20 @@ export function OverlayPanel({ onClose }: { onClose: () => void }) {
           </div>
           {theme === "table" && (
             <>
+              <h4 style={{ marginTop: 12 }}>Table layout</h4>
+              <div className="hc-theme-fields">
+                <label>
+                  <span>Visible rows ({tableRows})</span>
+                  <input
+                    type="range"
+                    min={3}
+                    max={30}
+                    step={1}
+                    value={tableRows}
+                    onChange={(e) => setTableRows(parseInt(e.currentTarget.value, 10))}
+                  />
+                </label>
+              </div>
               <h4 style={{ marginTop: 12 }}>Table columns</h4>
               <div className="hc-theme-fields">
                 <label className="hc-theme-check">

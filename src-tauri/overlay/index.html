@@ -127,7 +127,7 @@
   /* === table: all splits listed === */
   body.theme-table .row { display: none; }
   body.theme-table .split { display: none; }
-  body.theme-table .title { text-align: left; margin-bottom: 10px; font-size: 20px; }
+  body.theme-table .title { text-align: center; margin-bottom: 10px; font-size: 20px; }
   body.theme-table .splits-table {
     border-collapse: collapse;
     color: var(--text);
@@ -161,6 +161,12 @@
   }
   body.theme-table .splits-table tr.active td { color: var(--accent); }
   body.theme-table .splits-table tr.done { opacity: 0.72; }
+  body.theme-table .splits-table tr.sep td {
+    padding: 2px 10px;
+    text-align: center;
+    color: var(--muted);
+    border-top: 1px dashed rgba(255,255,255,0.2);
+  }
   body.theme-table .splits-table .delta.good { color: var(--good); }
   body.theme-table .splits-table .delta.bad { color: var(--bad); }
   body.theme-table .splits-totals {
@@ -209,7 +215,7 @@
   <div class="split" id="split"></div>
   <table class="splits-table" id="splitsTable" style="display:none">
     <thead>
-      <tr><th>Split</th><th class="col-hits">Hits</th><th class="col-delta">Δ</th><th class="col-time">Time</th><th class="col-pb">PB</th></tr>
+      <tr><th>Split</th><th class="col-hits">Hits / PB</th><th class="col-delta">Δ</th><th class="col-time">Time</th><th class="col-pb">PB time</th></tr>
     </thead>
     <tbody id="splitsTbody"></tbody>
   </table>
@@ -223,6 +229,7 @@
   const validThemes = ["default", "compact", "vertical", "hits", "minimal", "bigsplit", "table"];
   const validFonts = ["cinzel","orbitron","pressstart","russo","blackops","bebas","audiowide","creepster","bungee","metal"];
   const DEFAULT_SHADOW = "0 2px 6px rgba(0,0,0,0.85), 0 0 14px rgba(0,0,0,0.6)";
+  let tableRows = 8;
 
   function setVar(name, val) {
     if (val) document.documentElement.style.setProperty(name, val);
@@ -250,6 +257,9 @@
     if (!flag("colTime", true)) cls.push("hide-col-time");
     if (!flag("colPb", true)) cls.push("hide-col-pb");
     document.body.className = cls.join(" ");
+
+    const tr = parseInt(s.tableRows, 10);
+    tableRows = isFinite(tr) && tr >= 1 ? tr : 8;
 
     const titleEl = document.getElementById("title");
     titleEl.className = "title";
@@ -298,22 +308,46 @@
 
   let state = null;
 
+  function buildWindow(splits, activeIdx, maxRows) {
+    const n = splits.length;
+    if (n === 0) return [];
+    if (n <= maxRows) return splits.map((_, i) => ({ i, sep: false }));
+    const lastIdx = n - 1;
+    const focus = activeIdx >= 0 && activeIdx < n ? activeIdx : 0;
+    const pinLast = focus < lastIdx;
+    const win = pinLast ? Math.max(1, maxRows - 1) : maxRows;
+    let start = Math.max(0, focus - Math.floor(win / 2));
+    let end = start + win;
+    const cap = pinLast ? lastIdx : n;
+    if (end > cap) { end = cap; start = Math.max(0, end - win); }
+    const out = [];
+    for (let i = start; i < end; i++) out.push({ i, sep: false });
+    if (pinLast) {
+      if (end < lastIdx) out.push({ i: lastIdx, sep: true });
+      else out.push({ i: lastIdx, sep: false });
+    }
+    return out;
+  }
+
   function renderTable() {
     const tbody = $("splitsTbody");
     const splits = Array.isArray(state.splits) ? state.splits : [];
     const activeIdx = state.activeIdx ?? -1;
-    const rows = splits.map((sp, i) => {
+    const visible = buildWindow(splits, activeIdx, tableRows);
+    const rows = visible.map(({ i, sep }) => {
+      const sp = splits[i];
       const delta = sp.pbHits != null ? sp.hits - sp.pbHits : null;
       const dCls = delta == null ? "" : delta < 0 ? "good" : delta > 0 ? "bad" : "";
       const dTxt = delta == null ? "—" : delta > 0 ? `+${delta}` : delta;
       let rowCls = "";
       if (state.isRunning && i === activeIdx) rowCls = "active";
       else if (i < activeIdx || (state.isFinished && i <= activeIdx)) rowCls = "done";
+      if (sep) rowCls += " sep";
       let liveMs = sp.timeMs ?? 0;
       if (state.isRunning && i === activeIdx) liveMs += Date.now() - state.tsMs;
       const timeTxt = liveMs > 0 ? fmt(liveMs) : "—";
       const pbTxt = sp.pbTimeMs != null ? fmt(sp.pbTimeMs) : "—";
-      return `<tr class="${rowCls}">
+      return `<tr class="${rowCls.trim()}">
         <td class="name">${escapeHtml(sp.name ?? "")}</td>
         <td class="col-hits">${sp.hits ?? 0}${sp.pbHits != null ? ` / ${sp.pbHits}` : ""}</td>
         <td class="col-delta delta ${dCls}">${dTxt}</td>
@@ -348,7 +382,7 @@
 
     const pbT = state.totalPbTimeMs;
     const pbH = state.totalPbHits;
-    $("pb").textContent = `PB: ${pbT != null ? fmt(pbT) : "—"} · Best Hits: ${pbH ?? "—"}`;
+    $("pb").textContent = `PB: ${pbH ?? "—"} · PB time: ${pbT != null ? fmt(pbT) : "—"}`;
 
     const sp = state.activeSplit;
     if (sp) {
