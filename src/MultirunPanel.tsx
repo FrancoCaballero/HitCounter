@@ -1,5 +1,12 @@
 import { useState } from "react";
-import { Multirun, useMultirun } from "./multirun";
+import {
+  Multirun,
+  SubrunSnapshot,
+  snapshotFromCurrentRun,
+  snapshotFromTemplateSplits,
+  useMultirun,
+} from "./multirun";
+import { BUILTIN_TEMPLATES, Template, useTemplates } from "./templates";
 
 export function MultirunPanel({ onClose }: { onClose: () => void }) {
   const multiruns = useMultirun((s) => s.multiruns);
@@ -17,19 +24,71 @@ export function MultirunPanel({ onClose }: { onClose: () => void }) {
   const selectSubrun = useMultirun((s) => s.selectSubrun);
   const clearActive = useMultirun((s) => s.clearActive);
 
+  const customs = useTemplates((s) => s.customs);
+  const allTemplates: Template[] = [...BUILTIN_TEMPLATES, ...customs];
+
   const [newTitle, setNewTitle] = useState("");
   const [newRuns, setNewRuns] = useState("");
-
+  const [draftRuns, setDraftRuns] = useState<
+    { name: string; snapshot: SubrunSnapshot | null }[]
+  >([]);
+  const [pickTplId, setPickTplId] = useState("");
   function create() {
     const title = newTitle.trim();
-    const names = newRuns
+    const typed = newRuns
       .split(/[\n,]+/)
       .map((x) => x.trim())
-      .filter(Boolean);
-    if (!title || names.length === 0) return;
-    createMultirun(title, names);
+      .filter(Boolean)
+      .map((n) => ({ name: n, snapshot: null as SubrunSnapshot | null }));
+    const all = [...draftRuns, ...typed];
+    if (!title || all.length === 0) return;
+    const id = createMultirun(
+      title,
+      all.map((r) => r.name)
+    );
+    // attach snapshots for drafts that had one
+    const mr = useMultirun.getState();
+    const created = mr.multiruns.find((m) => m.id === id);
+    if (created) {
+      created.runs.forEach((r, i) => {
+        const src = all[i];
+        if (src?.snapshot) {
+          useMultirun.setState({
+            multiruns: useMultirun.getState().multiruns.map((m) =>
+              m.id === id
+                ? {
+                    ...m,
+                    runs: m.runs.map((rr) =>
+                      rr.id === r.id ? { ...rr, snapshot: src.snapshot } : rr
+                    ),
+                  }
+                : m
+            ),
+          });
+        }
+      });
+    }
     setNewTitle("");
     setNewRuns("");
+    setDraftRuns([]);
+    setPickTplId("");
+  }
+
+  function addDraftFromTemplate() {
+    const t = allTemplates.find((x) => x.id === pickTplId);
+    if (!t) return;
+    setDraftRuns((d) => [
+      ...d,
+      { name: t.name, snapshot: snapshotFromTemplateSplits(t.splits) },
+    ]);
+    setPickTplId("");
+  }
+
+  function addDraftFromCurrent() {
+    setDraftRuns((d) => [
+      ...d,
+      { name: "Current run", snapshot: snapshotFromCurrentRun() },
+    ]);
   }
 
   return (
@@ -74,7 +133,67 @@ export function MultirunPanel({ onClose }: { onClose: () => void }) {
                   fontFamily: "inherit",
                 }}
               />
-              <button onClick={create} disabled={!newTitle.trim() || !newRuns.trim()}>
+              <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
+                <select
+                  value={pickTplId}
+                  onChange={(e) => setPickTplId(e.currentTarget.value)}
+                  className="hc-font-select"
+                  style={{ flex: 1, minWidth: 180 }}
+                >
+                  <option value="">Pick saved run...</option>
+                  <optgroup label="Built-in">
+                    {BUILTIN_TEMPLATES.map((t) => (
+                      <option key={t.id} value={t.id}>{t.name}</option>
+                    ))}
+                  </optgroup>
+                  {customs.length > 0 && (
+                    <optgroup label="My templates">
+                      {customs.map((t) => (
+                        <option key={t.id} value={t.id}>{t.name}</option>
+                      ))}
+                    </optgroup>
+                  )}
+                </select>
+                <button onClick={addDraftFromTemplate} disabled={!pickTplId}>
+                  + Add saved run
+                </button>
+                <button onClick={addDraftFromCurrent}>
+                  + Add current run
+                </button>
+              </div>
+              {draftRuns.length > 0 && (
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                  {draftRuns.map((d, i) => (
+                    <span
+                      key={i}
+                      style={{
+                        display: "inline-flex",
+                        alignItems: "center",
+                        gap: 6,
+                        padding: "4px 10px",
+                        borderRadius: 999,
+                        background: "var(--panel-2)",
+                        border: "1px solid var(--accent)",
+                        color: "var(--text)",
+                        fontSize: 13,
+                      }}
+                    >
+                      {d.name}
+                      <button
+                        className="hc-x"
+                        onClick={() =>
+                          setDraftRuns((arr) => arr.filter((_, j) => j !== i))
+                        }
+                        title="Remove"
+                      >×</button>
+                    </span>
+                  ))}
+                </div>
+              )}
+              <button
+                onClick={create}
+                disabled={!newTitle.trim() || (!newRuns.trim() && draftRuns.length === 0)}
+              >
                 Create multirun
               </button>
             </div>
@@ -97,7 +216,9 @@ export function MultirunPanel({ onClose }: { onClose: () => void }) {
                       if (confirm(`Delete multirun "${m.title}"?`))
                         removeMultirun(m.id);
                     }}
-                    onAddSubrun={(name) => addSubrun(m.id, name)}
+                    onAddSubrun={(name, snap) => addSubrun(m.id, name, snap)}
+                    templates={allTemplates}
+                    customs={customs}
                     onRemoveSubrun={(sId) => removeSubrun(m.id, sId)}
                     onRenameSubrun={(sId, name) => renameSubrun(m.id, sId, name)}
                     onToggleCompleted={(sId) => toggleSubrunCompleted(m.id, sId)}
@@ -128,6 +249,8 @@ function MultirunCard({
   m,
   isActiveMultirun,
   activeSubrunId,
+  templates,
+  customs,
   onRenameMultirun,
   onRemoveMultirun,
   onAddSubrun,
@@ -140,9 +263,11 @@ function MultirunCard({
   m: Multirun;
   isActiveMultirun: boolean;
   activeSubrunId: string | null;
+  templates: Template[];
+  customs: Template[];
   onRenameMultirun: (title: string) => void;
   onRemoveMultirun: () => void;
-  onAddSubrun: (name: string) => void;
+  onAddSubrun: (name: string, snapshot?: SubrunSnapshot) => void;
   onRemoveSubrun: (sId: string) => void;
   onRenameSubrun: (sId: string, name: string) => void;
   onToggleCompleted: (sId: string) => void;
@@ -152,6 +277,7 @@ function MultirunCard({
   const [editingTitle, setEditingTitle] = useState(false);
   const [titleVal, setTitleVal] = useState(m.title);
   const [newSubrun, setNewSubrun] = useState("");
+  const [pickTpl, setPickTpl] = useState("");
   const doneCount = m.runs.filter((r) => r.completed).length;
 
   return (
@@ -186,6 +312,19 @@ function MultirunCard({
           {doneCount}/{m.runs.length} done
           {isActiveMultirun ? " · ACTIVE" : ""}
         </small>
+        {!isActiveMultirun && m.runs.length > 0 && (
+          <button
+            style={{ marginLeft: "auto" }}
+            onClick={() => {
+              const target =
+                m.runs.find((r) => !r.completed) || m.runs[0];
+              onSelectSubrun(target.id);
+            }}
+            title="Activate this multirun and load first pending run"
+          >
+            Activate
+          </button>
+        )}
       </div>
 
       <div style={{ display: "flex", flexDirection: "column", gap: 6, marginTop: 8 }}>
@@ -248,34 +387,72 @@ function MultirunCard({
         })}
       </div>
 
-      <div style={{ display: "flex", gap: 6, marginTop: 8 }}>
-        <input
-          placeholder="Add run..."
-          value={newSubrun}
-          onChange={(e) => setNewSubrun(e.currentTarget.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter" && newSubrun.trim()) {
+      <div style={{ display: "flex", flexDirection: "column", gap: 6, marginTop: 8 }}>
+        <div style={{ display: "flex", gap: 6 }}>
+          <input
+            placeholder="Add blank run..."
+            value={newSubrun}
+            onChange={(e) => setNewSubrun(e.currentTarget.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && newSubrun.trim()) {
+                onAddSubrun(newSubrun.trim());
+                setNewSubrun("");
+              }
+            }}
+            style={{
+              flex: 1,
+              background: "var(--panel-2)",
+              border: "1px solid var(--border)",
+              color: "var(--text)",
+              padding: "6px 10px",
+              borderRadius: 6,
+            }}
+          />
+          <button
+            onClick={() => {
+              if (!newSubrun.trim()) return;
               onAddSubrun(newSubrun.trim());
               setNewSubrun("");
-            }
-          }}
-          style={{
-            flex: 1,
-            background: "var(--panel-2)",
-            border: "1px solid var(--border)",
-            color: "var(--text)",
-            padding: "6px 10px",
-            borderRadius: 6,
-          }}
-        />
-        <button
-          onClick={() => {
-            if (!newSubrun.trim()) return;
-            onAddSubrun(newSubrun.trim());
-            setNewSubrun("");
-          }}
-        >+ Run</button>
-        <button onClick={onRemoveMultirun}>Delete multirun</button>
+            }}
+          >+ Run</button>
+        </div>
+        <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+          <select
+            value={pickTpl}
+            onChange={(e) => setPickTpl(e.currentTarget.value)}
+            className="hc-font-select"
+            style={{ flex: 1, minWidth: 160 }}
+          >
+            <option value="">Add saved run...</option>
+            <optgroup label="Built-in">
+              {templates
+                .filter((t) => !customs.find((c) => c.id === t.id))
+                .map((t) => (
+                  <option key={t.id} value={t.id}>{t.name}</option>
+                ))}
+            </optgroup>
+            {customs.length > 0 && (
+              <optgroup label="My templates">
+                {customs.map((t) => (
+                  <option key={t.id} value={t.id}>{t.name}</option>
+                ))}
+              </optgroup>
+            )}
+          </select>
+          <button
+            disabled={!pickTpl}
+            onClick={() => {
+              const t = templates.find((x) => x.id === pickTpl);
+              if (!t) return;
+              onAddSubrun(t.name, snapshotFromTemplateSplits(t.splits));
+              setPickTpl("");
+            }}
+          >+ Saved</button>
+          <button
+            onClick={() => onAddSubrun("Current run", snapshotFromCurrentRun())}
+          >+ Current</button>
+          <button onClick={onRemoveMultirun}>Delete multirun</button>
+        </div>
       </div>
     </div>
   );

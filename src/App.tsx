@@ -169,13 +169,31 @@ function App() {
         >
           <div
             style={{
-              fontSize: 22,
-              fontWeight: 700,
-              letterSpacing: 0.3,
-              textAlign: "center",
+              display: "flex",
+              alignItems: "center",
+              gap: 12,
+              width: "100%",
+              justifyContent: "center",
+              position: "relative",
             }}
           >
-            {activeMultirun.title}
+            <div
+              style={{
+                fontSize: 22,
+                fontWeight: 700,
+                letterSpacing: 0.3,
+                textAlign: "center",
+              }}
+            >
+              {activeMultirun.title}
+            </div>
+            <button
+              onClick={() => useMultirun.getState().clearActive()}
+              title="Deactivate multirun"
+              style={{ position: "absolute", right: 0 }}
+            >
+              Deactivate
+            </button>
           </div>
           <div
             style={{

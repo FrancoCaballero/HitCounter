@@ -29,7 +29,7 @@ type MultirunState = {
   createMultirun: (title: string, runNames: string[]) => string;
   removeMultirun: (id: string) => void;
   renameMultirun: (id: string, title: string) => void;
-  addSubrun: (mId: string, name: string) => void;
+  addSubrun: (mId: string, name: string, snapshot?: SubrunSnapshot) => void;
   removeSubrun: (mId: string, sId: string) => void;
   renameSubrun: (mId: string, sId: string, name: string) => void;
   toggleSubrunCompleted: (mId: string, sId: string) => void;
@@ -53,6 +53,23 @@ const emptySnapshot = (): SubrunSnapshot => ({
   totalPbHits: null,
   totalPbTimeMs: null,
 });
+
+export const snapshotFromTemplateSplits = (
+  splitNames: string[]
+): SubrunSnapshot => ({
+  splits: (splitNames.length ? splitNames : ["Split 1"]).map((n) => ({
+    id: crypto.randomUUID(),
+    name: n,
+    hits: 0,
+    timeMs: 0,
+    pbHits: null,
+    pbTimeMs: null,
+  })),
+  totalPbHits: null,
+  totalPbTimeMs: null,
+});
+
+export const snapshotFromCurrentRun = (): SubrunSnapshot => snapshotFromRun();
 
 const snapshotFromRun = (): SubrunSnapshot => {
   const s = useRun.getState();
@@ -119,7 +136,7 @@ export const useMultirun = create<MultirunState>()(
           multiruns: s.multiruns.map((m) => (m.id === id ? { ...m, title } : m)),
         })),
 
-      addSubrun: (mId, name) =>
+      addSubrun: (mId, name, snapshot) =>
         set((s) => ({
           multiruns: s.multiruns.map((m) =>
             m.id === mId
@@ -131,7 +148,7 @@ export const useMultirun = create<MultirunState>()(
                       id: crypto.randomUUID(),
                       name,
                       completed: false,
-                      snapshot: null,
+                      snapshot: snapshot ?? null,
                     },
                   ],
                 }
