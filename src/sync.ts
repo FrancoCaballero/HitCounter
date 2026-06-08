@@ -1,6 +1,14 @@
 import { invoke } from "@tauri-apps/api/core";
 import { useRun } from "./store";
 
+type SplitRow = {
+  name: string;
+  hits: number;
+  timeMs: number;
+  pbHits: number | null;
+  pbTimeMs: number | null;
+};
+
 type Snapshot = {
   tsMs: number;
   title: string;
@@ -10,13 +18,9 @@ type Snapshot = {
   totalPbHits: number | null;
   totalPbTimeMs: number | null;
   runElapsedMs: number;
-  activeSplit: {
-    name: string;
-    hits: number;
-    timeMs: number;
-    pbHits: number | null;
-    pbTimeMs: number | null;
-  } | null;
+  activeIdx: number;
+  splits: SplitRow[];
+  activeSplit: SplitRow | null;
 };
 
 function snapshot(): Snapshot {
@@ -30,6 +34,16 @@ function snapshot(): Snapshot {
     ? sp.timeMs +
       (s.isRunning && s.splitStartedAt ? now - s.splitStartedAt : 0)
     : 0;
+  const splits: SplitRow[] = s.splits.map((row, i) => ({
+    name: row.name,
+    hits: row.hits,
+    timeMs:
+      i === s.activeIdx
+        ? row.timeMs + (s.isRunning && s.splitStartedAt ? now - s.splitStartedAt : 0)
+        : row.timeMs,
+    pbHits: row.pbHits,
+    pbTimeMs: row.pbTimeMs,
+  }));
   return {
     tsMs: Date.now(),
     title: s.title,
@@ -39,6 +53,8 @@ function snapshot(): Snapshot {
     totalPbHits: s.totalPbHits,
     totalPbTimeMs: s.totalPbTimeMs,
     runElapsedMs: runElapsed,
+    activeIdx: s.activeIdx,
+    splits,
     activeSplit: sp
       ? {
           name: sp.name,
@@ -63,6 +79,7 @@ async function push() {
 
 export function startSync() {
   push();
+  pushStyle(loadStyle());
   useRun.subscribe(() => push());
   // Frequent push while running to keep timer fresh on (re)connect.
   setInterval(() => {
@@ -79,4 +96,72 @@ export async function getOverlayUrl(): Promise<string> {
   } catch {
     return "http://localhost:17800/";
   }
+}
+
+export type OverlayStyle = {
+  theme: string;
+  accent: string;
+  text: string;
+  scale: number;
+  noShadow: boolean;
+  titleFont: string;
+  show: {
+    title: boolean;
+    totalHits: boolean;
+    totalTimer: boolean;
+    totalPb: boolean;
+    activeSplit: boolean;
+    colHits: boolean;
+    colDelta: boolean;
+    colTime: boolean;
+    colPb: boolean;
+    tableTotals: boolean;
+  };
+};
+
+export const DEFAULT_STYLE: OverlayStyle = {
+  theme: "default",
+  accent: "#ffb454",
+  text: "#ffffff",
+  scale: 1,
+  noShadow: false,
+  titleFont: "",
+  show: {
+    title: true,
+    totalHits: true,
+    totalTimer: true,
+    totalPb: true,
+    activeSplit: true,
+    colHits: true,
+    colDelta: true,
+    colTime: true,
+    colPb: true,
+    tableTotals: true,
+  },
+};
+
+const STYLE_KEY = "hc.overlayStyle";
+
+export function loadStyle(): OverlayStyle {
+  try {
+    const raw = localStorage.getItem(STYLE_KEY);
+    if (!raw) return { ...DEFAULT_STYLE, show: { ...DEFAULT_STYLE.show } };
+    const parsed = JSON.parse(raw);
+    return {
+      ...DEFAULT_STYLE,
+      ...parsed,
+      show: { ...DEFAULT_STYLE.show, ...(parsed.show || {}) },
+    };
+  } catch {
+    return { ...DEFAULT_STYLE, show: { ...DEFAULT_STYLE.show } };
+  }
+}
+
+export async function pushStyle(style: OverlayStyle): Promise<void> {
+  try {
+    localStorage.setItem(STYLE_KEY, JSON.stringify(style));
+  } catch {}
+  try {
+    await invoke("push_style", { payload: JSON.stringify(style) });
+  } catch {}
 }

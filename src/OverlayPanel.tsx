@@ -1,5 +1,5 @@
-import { useEffect, useState } from "react";
-import { getOverlayUrl } from "./sync";
+import { useEffect, useRef, useState } from "react";
+import { getOverlayUrl, loadStyle, pushStyle, DEFAULT_STYLE, OverlayStyle } from "./sync";
 
 type Theme = {
   id: string;
@@ -28,38 +28,53 @@ const THEMES: Theme[] = [
   { id: "hits", name: "Hits Only", desc: "Giant hit counter, nothing else" },
   { id: "minimal", name: "Minimal", desc: "Tiny everything, edge of screen" },
   { id: "bigsplit", name: "Big Split", desc: "Emphasis on current split name" },
+  { id: "table", name: "Splits Table", desc: "All splits listed as a table (LiveSplit style)" },
 ];
 
-function stripHash(h: string) {
-  return h.replace(/^#/, "");
-}
-
 export function OverlayPanel({ onClose }: { onClose: () => void }) {
-  const [theme, setTheme] = useState("default");
-  const [accent, setAccent] = useState("#ffb454");
-  const [text, setText] = useState("#ffffff");
-  const [scale, setScale] = useState(1);
-  const [noShadow, setNoShadow] = useState(false);
-  const [titleFont, setTitleFont] = useState("");
+  const initial = loadStyle();
+  const [theme, setTheme] = useState(initial.theme);
+  const [accent, setAccent] = useState(initial.accent);
+  const [text, setText] = useState(initial.text);
+  const [scale, setScale] = useState(initial.scale);
+  const [noShadow, setNoShadow] = useState(initial.noShadow);
+  const [titleFont, setTitleFont] = useState(initial.titleFont);
+  const [show, setShow] = useState(initial.show);
   const [base, setBase] = useState("http://localhost:17800/");
+  const debounceRef = useRef<number | null>(null);
 
   useEffect(() => {
     getOverlayUrl().then(setBase);
   }, []);
 
-  const url = (() => {
-    const u = new URL(base);
-    u.searchParams.set("theme", theme);
-    if (accent !== "#ffb454") u.searchParams.set("accent", stripHash(accent));
-    if (text !== "#ffffff") u.searchParams.set("text", stripHash(text));
-    if (scale !== 1) u.searchParams.set("scale", String(scale));
-    if (noShadow) u.searchParams.set("noshadow", "1");
-    if (titleFont) u.searchParams.set("titlefont", titleFont);
-    return u.toString();
-  })();
+  const style: OverlayStyle = { theme, accent, text, scale, noShadow, titleFont, show };
+
+  useEffect(() => {
+    if (debounceRef.current !== null) window.clearTimeout(debounceRef.current);
+    debounceRef.current = window.setTimeout(() => {
+      pushStyle(style);
+    }, 80);
+    return () => {
+      if (debounceRef.current !== null) window.clearTimeout(debounceRef.current);
+    };
+  }, [theme, accent, text, scale, noShadow, titleFont, show]);
+
+  function toggle(key: keyof OverlayStyle["show"]) {
+    setShow((s) => ({ ...s, [key]: !s[key] }));
+  }
 
   async function copy() {
-    await navigator.clipboard.writeText(url);
+    await navigator.clipboard.writeText(base);
+  }
+
+  function reset() {
+    setTheme(DEFAULT_STYLE.theme);
+    setAccent(DEFAULT_STYLE.accent);
+    setText(DEFAULT_STYLE.text);
+    setScale(DEFAULT_STYLE.scale);
+    setNoShadow(DEFAULT_STYLE.noShadow);
+    setTitleFont(DEFAULT_STYLE.titleFont);
+    setShow({ ...DEFAULT_STYLE.show });
   }
 
   return (
@@ -139,33 +154,78 @@ export function OverlayPanel({ onClose }: { onClose: () => void }) {
           </div>
         </section>
 
+        <section className="hc-theme-customize">
+          <h4>Elements</h4>
+          <div className="hc-theme-fields">
+            <label className="hc-theme-check">
+              <input type="checkbox" checked={show.title} onChange={() => toggle("title")} />
+              <span>Title</span>
+            </label>
+            <label className="hc-theme-check">
+              <input type="checkbox" checked={show.totalHits} onChange={() => toggle("totalHits")} />
+              <span>Total hits</span>
+            </label>
+            <label className="hc-theme-check">
+              <input type="checkbox" checked={show.totalTimer} onChange={() => toggle("totalTimer")} />
+              <span>Total timer</span>
+            </label>
+            <label className="hc-theme-check">
+              <input type="checkbox" checked={show.totalPb} onChange={() => toggle("totalPb")} />
+              <span>PB row</span>
+            </label>
+            <label className="hc-theme-check">
+              <input type="checkbox" checked={show.activeSplit} onChange={() => toggle("activeSplit")} />
+              <span>Active split</span>
+            </label>
+          </div>
+          {theme === "table" && (
+            <>
+              <h4 style={{ marginTop: 12 }}>Table columns</h4>
+              <div className="hc-theme-fields">
+                <label className="hc-theme-check">
+                  <input type="checkbox" checked={show.colHits} onChange={() => toggle("colHits")} />
+                  <span>Hits</span>
+                </label>
+                <label className="hc-theme-check">
+                  <input type="checkbox" checked={show.colDelta} onChange={() => toggle("colDelta")} />
+                  <span>Δ</span>
+                </label>
+                <label className="hc-theme-check">
+                  <input type="checkbox" checked={show.colTime} onChange={() => toggle("colTime")} />
+                  <span>Time</span>
+                </label>
+                <label className="hc-theme-check">
+                  <input type="checkbox" checked={show.colPb} onChange={() => toggle("colPb")} />
+                  <span>PB time</span>
+                </label>
+                <label className="hc-theme-check">
+                  <input type="checkbox" checked={show.tableTotals} onChange={() => toggle("tableTotals")} />
+                  <span>Totals row</span>
+                </label>
+              </div>
+            </>
+          )}
+        </section>
+
         <section className="hc-theme-preview">
           <iframe
             title="overlay preview"
-            src={url}
+            src={base}
             className="hc-iframe"
           />
         </section>
 
         <section className="hc-theme-url">
-          <input readOnly value={url} onFocus={(e) => e.currentTarget.select()} />
+          <input readOnly value={base} onFocus={(e) => e.currentTarget.select()} />
           <button onClick={copy}>Copy</button>
+          <small style={{ display: "block", marginTop: 6, opacity: 0.7 }}>
+            Pegá esta URL en OBS una vez. Los cambios se aplican en vivo sin tocar OBS.
+          </small>
         </section>
         </div>
 
         <div className="hc-modal-foot">
-          <button
-            onClick={() => {
-              setTheme("default");
-              setAccent("#ffb454");
-              setText("#ffffff");
-              setScale(1);
-              setNoShadow(false);
-              setTitleFont("");
-            }}
-          >
-            Reset
-          </button>
+          <button onClick={reset}>Reset</button>
           <button onClick={onClose}>Close</button>
         </div>
       </div>

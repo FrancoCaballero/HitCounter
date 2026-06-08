@@ -10,7 +10,16 @@ async fn push_state(
     payload: String,
     state: tauri::State<'_, OverlayState>,
 ) -> Result<(), String> {
-    state.push(payload).await;
+    state.push_state(payload).await;
+    Ok(())
+}
+
+#[tauri::command]
+async fn push_style(
+    payload: String,
+    state: tauri::State<'_, OverlayState>,
+) -> Result<(), String> {
+    state.push_style(payload).await;
     Ok(())
 }
 
@@ -34,7 +43,7 @@ pub fn run() {
             });
             Ok(())
         })
-        .invoke_handler(tauri::generate_handler![push_state, overlay_url])
+        .invoke_handler(tauri::generate_handler![push_state, push_style, overlay_url])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }

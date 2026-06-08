@@ -124,6 +124,70 @@
   body.theme-minimal .split { font-size: 12px; margin-top: 4px; }
   body.theme-minimal .split .sub { font-size: 11px; }
 
+  /* === table: all splits listed === */
+  body.theme-table .row { display: none; }
+  body.theme-table .split { display: none; }
+  body.theme-table .title { text-align: left; margin-bottom: 10px; font-size: 20px; }
+  body.theme-table .splits-table {
+    border-collapse: collapse;
+    color: var(--text);
+    text-shadow: var(--shadow);
+    font-size: 16px;
+    min-width: 360px;
+  }
+  body.theme-table .splits-table th {
+    text-align: right;
+    font-weight: 600;
+    color: var(--muted);
+    padding: 4px 10px;
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    border-bottom: 1px solid rgba(255,255,255,0.15);
+  }
+  body.theme-table .splits-table th:first-child { text-align: left; }
+  body.theme-table .splits-table td {
+    padding: 5px 10px;
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+  }
+  body.theme-table .splits-table td.name {
+    text-align: left;
+    font-weight: 600;
+    max-width: 220px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  body.theme-table .splits-table tr.active td { color: var(--accent); }
+  body.theme-table .splits-table tr.done { opacity: 0.72; }
+  body.theme-table .splits-table .delta.good { color: var(--good); }
+  body.theme-table .splits-table .delta.bad { color: var(--bad); }
+  body.theme-table .splits-totals {
+    margin-top: 8px;
+    padding-top: 8px;
+    border-top: 1px solid rgba(255,255,255,0.2);
+    display: flex;
+    justify-content: space-between;
+    gap: 24px;
+    font-size: 18px;
+    font-weight: 700;
+    text-shadow: var(--shadow);
+  }
+  body.theme-table .splits-totals .accent { color: var(--accent); }
+
+  /* element toggles */
+  body.hide-title .title { display: none !important; }
+  body.hide-totalhits .hits { display: none !important; }
+  body.hide-totaltimer .timer { display: none !important; }
+  body.hide-totalpb .pb { display: none !important; }
+  body.hide-activesplit .split { display: none !important; }
+  body.hide-tabletotals .splits-totals { display: none !important; }
+  body.hide-col-hits .splits-table .col-hits { display: none; }
+  body.hide-col-delta .splits-table .col-delta { display: none; }
+  body.hide-col-time .splits-table .col-time { display: none; }
+  body.hide-col-pb .splits-table .col-pb { display: none; }
+
   /* === bigsplit: highlight current split === */
   body.theme-bigsplit .row { display: flex; align-items: center; gap: 18px; }
   body.theme-bigsplit .hits { font-size: 64px; }
@@ -143,35 +207,83 @@
     </div>
   </div>
   <div class="split" id="split"></div>
+  <table class="splits-table" id="splitsTable" style="display:none">
+    <thead>
+      <tr><th>Split</th><th class="col-hits">Hits</th><th class="col-delta">Δ</th><th class="col-time">Time</th><th class="col-pb">PB</th></tr>
+    </thead>
+    <tbody id="splitsTbody"></tbody>
+  </table>
+  <div class="splits-totals" id="splitsTotals" style="display:none">
+    <span>Total: <span class="accent" id="totHits">0</span> hits</span>
+    <span id="totTime">00:00.00</span>
+  </div>
 </div>
 <script>
   const params = new URLSearchParams(location.search);
-  const theme = (params.get("theme") || "default").toLowerCase();
-  const valid = ["default", "compact", "vertical", "hits", "minimal", "bigsplit"];
-  document.body.className = "theme-" + (valid.includes(theme) ? theme : "default");
-
-  const titleFont = (params.get("titlefont") || "").toLowerCase();
+  const validThemes = ["default", "compact", "vertical", "hits", "minimal", "bigsplit", "table"];
   const validFonts = ["cinzel","orbitron","pressstart","russo","blackops","bebas","audiowide","creepster","bungee","metal"];
-  if (validFonts.includes(titleFont)) {
-    document.getElementById("title").classList.add("font-" + titleFont);
-  }
+  const DEFAULT_SHADOW = "0 2px 6px rgba(0,0,0,0.85), 0 0 14px rgba(0,0,0,0.6)";
 
   function setVar(name, val) {
     if (val) document.documentElement.style.setProperty(name, val);
+    else document.documentElement.style.removeProperty(name);
   }
-  setVar("--accent", params.get("accent") && "#" + params.get("accent"));
-  setVar("--text", params.get("text") && "#" + params.get("text"));
-  setVar("--good", params.get("good") && "#" + params.get("good"));
-  setVar("--bad", params.get("bad") && "#" + params.get("bad"));
-  setVar("--muted", params.get("muted") && "#" + params.get("muted"));
-  const scale = parseFloat(params.get("scale") || "1");
-  if (scale && scale !== 1) {
-    document.body.style.transform = `scale(${scale})`;
-    document.body.style.transformOrigin = "top left";
+  function withHash(v) {
+    if (!v) return null;
+    return v.startsWith("#") ? v : "#" + v;
   }
-  if (params.get("noshadow") === "1") {
-    setVar("--shadow", "none");
+
+  function applyStyle(s) {
+    s = s || {};
+    const theme = (s.theme || "default").toLowerCase();
+    const cls = ["theme-" + (validThemes.includes(theme) ? theme : "default")];
+    const show = s.show || {};
+    const flag = (k, def) => (k in show ? !!show[k] : def);
+    if (!flag("title", true)) cls.push("hide-title");
+    if (!flag("totalHits", true)) cls.push("hide-totalhits");
+    if (!flag("totalTimer", true)) cls.push("hide-totaltimer");
+    if (!flag("totalPb", true)) cls.push("hide-totalpb");
+    if (!flag("activeSplit", true)) cls.push("hide-activesplit");
+    if (!flag("tableTotals", true)) cls.push("hide-tabletotals");
+    if (!flag("colHits", true)) cls.push("hide-col-hits");
+    if (!flag("colDelta", true)) cls.push("hide-col-delta");
+    if (!flag("colTime", true)) cls.push("hide-col-time");
+    if (!flag("colPb", true)) cls.push("hide-col-pb");
+    document.body.className = cls.join(" ");
+
+    const titleEl = document.getElementById("title");
+    titleEl.className = "title";
+    const tf = (s.titleFont || "").toLowerCase();
+    if (validFonts.includes(tf)) titleEl.classList.add("font-" + tf);
+
+    setVar("--accent", withHash(s.accent) || "#ffb454");
+    setVar("--text", withHash(s.text) || "#ffffff");
+    setVar("--good", withHash(s.good) || "#4ade80");
+    setVar("--bad", withHash(s.bad) || "#f87171");
+    setVar("--muted", withHash(s.muted) || "#b8c0d4");
+    setVar("--shadow", s.noShadow ? "none" : DEFAULT_SHADOW);
+
+    const scale = parseFloat(s.scale);
+    if (scale && scale !== 1) {
+      document.body.style.transform = `scale(${scale})`;
+      document.body.style.transformOrigin = "top left";
+    } else {
+      document.body.style.transform = "";
+    }
   }
+
+  // Initial style from URL params as fallback until WS delivers stored style.
+  applyStyle({
+    theme: params.get("theme") || "default",
+    titleFont: params.get("titlefont") || "",
+    accent: params.get("accent"),
+    text: params.get("text"),
+    good: params.get("good"),
+    bad: params.get("bad"),
+    muted: params.get("muted"),
+    scale: params.get("scale") || "1",
+    noShadow: params.get("noshadow") === "1",
+  });
 
   const $ = (id) => document.getElementById(id);
   const fmt = (ms) => {
@@ -186,8 +298,47 @@
 
   let state = null;
 
+  function renderTable() {
+    const tbody = $("splitsTbody");
+    const splits = Array.isArray(state.splits) ? state.splits : [];
+    const activeIdx = state.activeIdx ?? -1;
+    const rows = splits.map((sp, i) => {
+      const delta = sp.pbHits != null ? sp.hits - sp.pbHits : null;
+      const dCls = delta == null ? "" : delta < 0 ? "good" : delta > 0 ? "bad" : "";
+      const dTxt = delta == null ? "—" : delta > 0 ? `+${delta}` : delta;
+      let rowCls = "";
+      if (state.isRunning && i === activeIdx) rowCls = "active";
+      else if (i < activeIdx || (state.isFinished && i <= activeIdx)) rowCls = "done";
+      let liveMs = sp.timeMs ?? 0;
+      if (state.isRunning && i === activeIdx) liveMs += Date.now() - state.tsMs;
+      const timeTxt = liveMs > 0 ? fmt(liveMs) : "—";
+      const pbTxt = sp.pbTimeMs != null ? fmt(sp.pbTimeMs) : "—";
+      return `<tr class="${rowCls}">
+        <td class="name">${escapeHtml(sp.name ?? "")}</td>
+        <td class="col-hits">${sp.hits ?? 0}${sp.pbHits != null ? ` / ${sp.pbHits}` : ""}</td>
+        <td class="col-delta delta ${dCls}">${dTxt}</td>
+        <td class="col-time">${timeTxt}</td>
+        <td class="col-pb">${pbTxt}</td>
+      </tr>`;
+    }).join("");
+    tbody.innerHTML = rows;
+
+    $("totHits").textContent = state.totalHits ?? 0;
+    let runMs = state.runElapsedMs ?? 0;
+    if (state.isRunning) runMs += Date.now() - state.tsMs;
+    $("totTime").textContent = fmt(runMs);
+  }
+
   function render() {
     if (!state) return;
+    const isTable = document.body.classList.contains("theme-table");
+    $("splitsTable").style.display = isTable ? "" : "none";
+    $("splitsTotals").style.display = isTable ? "" : "none";
+    if (isTable) {
+      $("title").textContent = state.title ?? "";
+      renderTable();
+      return;
+    }
     $("title").textContent = state.title ?? "";
     $("hits").textContent = state.totalHits ?? 0;
 
@@ -226,9 +377,18 @@
     const ws = new WebSocket(`ws://${location.host}/ws`);
     ws.onmessage = (e) => {
       try {
-        state = JSON.parse(e.data);
+        const msg = JSON.parse(e.data);
         document.getElementById("root").classList.remove("conn-off");
-        render();
+        if (msg && msg.kind === "style") {
+          applyStyle(msg.data || {});
+        } else if (msg && msg.kind === "state") {
+          state = msg.data;
+          render();
+        } else {
+          // Backwards compat: untagged payload treated as state.
+          state = msg;
+          render();
+        }
       } catch {}
     };
     ws.onclose = () => {

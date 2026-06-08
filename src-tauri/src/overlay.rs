@@ -14,7 +14,12 @@ use tower_http::cors::CorsLayer;
 #[derive(Clone)]
 pub struct OverlayState {
     pub last_state: Arc<RwLock<String>>,
+    pub last_style: Arc<RwLock<String>>,
     pub tx: broadcast::Sender<String>,
+}
+
+fn wrap(kind: &str, data_json: &str) -> String {
+    format!(r#"{{"kind":"{}","data":{}}}"#, kind, data_json)
 }
 
 impl OverlayState {
@@ -22,13 +27,21 @@ impl OverlayState {
         let (tx, _) = broadcast::channel::<String>(64);
         Self {
             last_state: Arc::new(RwLock::new(String::from("{}"))),
+            last_style: Arc::new(RwLock::new(String::from("{}"))),
             tx,
         }
     }
 
-    pub async fn push(&self, payload: String) {
-        *self.last_state.write().await = payload.clone();
-        let _ = self.tx.send(payload);
+    pub async fn push_state(&self, payload: String) {
+        let msg = wrap("state", &payload);
+        *self.last_state.write().await = payload;
+        let _ = self.tx.send(msg);
+    }
+
+    pub async fn push_style(&self, payload: String) {
+        let msg = wrap("style", &payload);
+        *self.last_style.write().await = payload;
+        let _ = self.tx.send(msg);
     }
 }
 
@@ -57,8 +70,22 @@ async fn ws_handler(
 }
 
 async fn handle_socket(mut socket: WebSocket, state: OverlayState) {
-    let initial = state.last_state.read().await.clone();
-    let _ = socket.send(Message::Text(initial)).await;
+    let style = state.last_style.read().await.clone();
+    let initial_state = state.last_state.read().await.clone();
+    if socket
+        .send(Message::Text(wrap("style", &style)))
+        .await
+        .is_err()
+    {
+        return;
+    }
+    if socket
+        .send(Message::Text(wrap("state", &initial_state)))
+        .await
+        .is_err()
+    {
+        return;
+    }
 
     let mut rx = state.tx.subscribe();
     loop {
