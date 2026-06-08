@@ -23,6 +23,7 @@ type RunState = {
   splitStartedAt: number | null;
   isRunning: boolean;
   isFinished: boolean;
+  activeTemplateId: string | null;
 
   startRun: () => void;
   pauseRun: () => void;
@@ -41,6 +42,7 @@ type RunState = {
   setTitle: (title: string) => void;
   toggleSplitDone: (id: string) => void;
   jumpToSplit: (id: string) => void;
+  setActiveTemplateId: (id: string | null) => void;
 };
 
 const blankSplit = (name: string): Split => ({
@@ -66,6 +68,7 @@ export const useRun = create<RunState>()(
       splitStartedAt: null,
       isRunning: false,
       isFinished: false,
+      activeTemplateId: null,
 
       startRun: () => {
         const now = performance.now();
@@ -267,6 +270,8 @@ export const useRun = create<RunState>()(
           ),
         })),
 
+      setActiveTemplateId: (id) => set({ activeTemplateId: id }),
+
       jumpToSplit: (id) =>
         set((s) => {
           const idx = s.splits.findIndex((sp) => sp.id === id);
@@ -300,6 +305,7 @@ export const useRun = create<RunState>()(
         })),
         totalPbHits: s.totalPbHits,
         totalPbTimeMs: s.totalPbTimeMs,
+        activeTemplateId: s.activeTemplateId,
       }),
     }
   )

@@ -99,6 +99,7 @@ const loadSnapshot = (m: Multirun, sub: Subrun) => {
     runElapsedMs: 0,
     isRunning: false,
     isFinished: false,
+    activeTemplateId: null,
   });
 };
 

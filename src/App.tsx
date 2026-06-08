@@ -7,6 +7,7 @@ import { OverlayPanel } from "./OverlayPanel";
 import { BackupPanel } from "./BackupPanel";
 import { MultirunPanel } from "./MultirunPanel";
 import { useMultirun } from "./multirun";
+import { useTemplates } from "./templates";
 import { ConfirmHost } from "./Confirm";
 import "./App.css";
 
@@ -103,6 +104,10 @@ function App() {
   const dragIdRef = useRef<string | null>(null);
 
   const store = useRun.getState();
+  const activeTemplateId = useRun((s) => s.activeTemplateId);
+  const linkedTemplate = useTemplates((s) =>
+    activeTemplateId ? s.customs.find((t) => t.id === activeTemplateId) ?? null : null
+  );
 
   return (
     <main className="hc-root">
@@ -112,6 +117,29 @@ function App() {
         value={useRun((s) => s.title)}
         onChange={(e) => store.setTitle(e.currentTarget.value)}
       />
+      {linkedTemplate && (
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 8,
+            fontSize: 12,
+            color: "var(--muted)",
+            padding: "0 4px",
+          }}
+        >
+          <span>
+            Editing template: <b style={{ color: "var(--accent)" }}>{linkedTemplate.name}</b> · changes auto-save
+          </span>
+          <button
+            onClick={() => store.setActiveTemplateId(null)}
+            style={{ padding: "2px 8px", fontSize: 11 }}
+            title="Stop syncing edits to this template"
+          >
+            Unlink
+          </button>
+        </div>
+      )}
 
       <header className="hc-header">
         <div className="hc-timer">
