@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <rect x="0" y="0" width="1024" height="1024" rx="180" ry="180" fill="#1f0a18"/>
+
+  <g transform="translate(512 520)">
+    <path d="M -270 -40
+             a 270 280 0 1 1 540 0
+             L 270 200
+             a 40 40 0 0 1 -40 40
+             L -230 240
+             a 40 40 0 0 1 -40 -40
+             Z"
+          fill="#fdf2f7" stroke="#1a0410" stroke-width="28" stroke-linejoin="round"/>
+
+    <rect x="-200" y="200" width="60" height="120" rx="12" fill="#fdf2f7" stroke="#1a0410" stroke-width="28" stroke-linejoin="round"/>
+    <rect x="-110" y="200" width="60" height="120" rx="12" fill="#fdf2f7" stroke="#1a0410" stroke-width="28" stroke-linejoin="round"/>
+    <rect x="-20"  y="200" width="60" height="120" rx="12" fill="#fdf2f7" stroke="#1a0410" stroke-width="28" stroke-linejoin="round"/>
+    <rect x="70"   y="200" width="60" height="120" rx="12" fill="#fdf2f7" stroke="#1a0410" stroke-width="28" stroke-linejoin="round"/>
+
+    <ellipse cx="-125" cy="-60" rx="85" ry="100" fill="#1a0410"/>
+    <ellipse cx="125"  cy="-60" rx="85" ry="100" fill="#1a0410"/>
+
+    <path d="M 0 60 L -35 130 L 0 110 L 35 130 Z" fill="#1a0410"/>
+  </g>
+</svg>
