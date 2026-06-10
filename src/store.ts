@@ -1,6 +1,8 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 
+export type RunMode = "hits" | "checklist";
+
 export type Split = {
   id: string;
   name: string;
@@ -9,10 +11,13 @@ export type Split = {
   pbHits: number | null;
   pbTimeMs: number | null;
   done?: boolean;
+  completedAtMs?: number | null;
+  checkedAtTs?: number | null;
 };
 
 type RunState = {
   title: string;
+  mode: RunMode;
   splits: Split[];
   activeIdx: number;
   totalHits: number;
@@ -24,6 +29,7 @@ type RunState = {
   isRunning: boolean;
   isFinished: boolean;
   activeTemplateId: string | null;
+  setMode: (mode: RunMode) => void;
 
   startRun: () => void;
   pauseRun: () => void;
@@ -58,6 +64,7 @@ export const useRun = create<RunState>()(
   persist(
     (set, get) => ({
       title: "",
+      mode: "hits",
       splits: [blankSplit("Split 1")],
       activeIdx: 0,
       totalHits: 0,
@@ -70,6 +77,8 @@ export const useRun = create<RunState>()(
       isFinished: false,
       activeTemplateId: null,
 
+      setMode: (mode) => set({ mode }),
+
       startRun: () => {
         const now = performance.now();
         set((s) => ({
@@ -78,6 +87,8 @@ export const useRun = create<RunState>()(
             hits: 0,
             timeMs: 0,
             done: false,
+            completedAtMs: null,
+            checkedAtTs: null,
           })),
           activeIdx: 0,
           totalHits: 0,
@@ -114,7 +125,7 @@ export const useRun = create<RunState>()(
 
       resetRun: () => {
         set((s) => ({
-          splits: s.splits.map((sp) => ({ ...sp, hits: 0, timeMs: 0, done: false })),
+          splits: s.splits.map((sp) => ({ ...sp, hits: 0, timeMs: 0, done: false, completedAtMs: null, checkedAtTs: null })),
           activeIdx: 0,
           totalHits: 0,
           runStartedAt: null,
@@ -263,12 +274,32 @@ export const useRun = create<RunState>()(
 
       setTitle: (title) => set({ title }),
 
-      toggleSplitDone: (id) =>
-        set((s) => ({
-          splits: s.splits.map((sp) =>
-            sp.id === id ? { ...sp, done: !sp.done } : sp
-          ),
-        })),
+      toggleSplitDone: (id) => {
+        const s = get();
+        const now = performance.now();
+        const wall = Date.now();
+        const liveRun =
+          s.runElapsedMs + (s.isRunning && s.runStartedAt ? now - s.runStartedAt : 0);
+        const splits = s.splits.map((sp) => {
+          if (sp.id !== id) return sp;
+          const next = !sp.done;
+          return {
+            ...sp,
+            done: next,
+            completedAtMs: next ? liveRun : null,
+            checkedAtTs: next ? wall : null,
+          };
+        });
+        set({ splits });
+        if (
+          s.mode === "checklist" &&
+          s.isRunning &&
+          splits.length > 0 &&
+          splits.every((sp) => sp.done)
+        ) {
+          get().finishRun();
+        }
+      },
 
       setActiveTemplateId: (id) => set({ activeTemplateId: id }),
 
@@ -298,15 +329,22 @@ export const useRun = create<RunState>()(
       name: "hitcounter-run",
       partialize: (s) => ({
         title: s.title,
-        splits: s.splits.map((sp) => ({
-          ...sp,
-          hits: 0,
-          timeMs: 0,
-        })),
+        mode: s.mode,
+        splits: s.splits,
+        activeIdx: s.activeIdx,
+        totalHits: s.totalHits,
         totalPbHits: s.totalPbHits,
         totalPbTimeMs: s.totalPbTimeMs,
+        runElapsedMs: s.runElapsedMs,
+        isFinished: s.isFinished,
         activeTemplateId: s.activeTemplateId,
       }),
+      onRehydrateStorage: () => (state) => {
+        if (!state) return;
+        state.runStartedAt = null;
+        state.splitStartedAt = null;
+        state.isRunning = false;
+      },
     }
   )
 );

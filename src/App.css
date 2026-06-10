@@ -287,12 +287,17 @@ button:disabled { opacity: 0.45; cursor: not-allowed; }
 .hc-modal-body {
   flex: 1;
   overflow-y: auto;
+  overflow-x: hidden;
   min-height: 0;
+  min-width: 0;
   display: flex;
   flex-direction: column;
   gap: 12px;
+  padding-right: 10px;
+  margin-right: -6px;
 }
-.hc-modal-body > * { flex-shrink: 0; }
+.hc-modal-body > * { flex-shrink: 0; min-width: 0; }
+.hc-modal-body input, .hc-modal-body select { max-width: 100%; box-sizing: border-box; }
 
 .hc-stats {
   display: grid;

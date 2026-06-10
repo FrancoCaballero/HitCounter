@@ -27,23 +27,24 @@ function useTimerTick() {
 }
 
 function useHotkeys() {
-  const { addHit, undoHit, nextSplit, startRun, pauseRun, resumeRun, resetRun, isRunning, isFinished } =
+  const { addHit, undoHit, nextSplit, startRun, pauseRun, resumeRun, resetRun, isRunning, isFinished, mode } =
     useRun();
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
+      const hitsMode = mode === "hits";
       switch (e.code) {
         case "Numpad1":
         case "KeyH":
-          addHit();
+          if (hitsMode) addHit();
           break;
         case "Numpad0":
         case "Backspace":
-          undoHit();
+          if (hitsMode) undoHit();
           break;
         case "Numpad2":
         case "KeyN":
-          nextSplit();
+          if (hitsMode) nextSplit();
           break;
         case "Space":
           e.preventDefault();
@@ -60,12 +61,27 @@ function useHotkeys() {
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [addHit, undoHit, nextSplit, startRun, pauseRun, resumeRun, resetRun, isRunning, isFinished]);
+  }, [addHit, undoHit, nextSplit, startRun, pauseRun, resumeRun, resetRun, isRunning, isFinished, mode]);
+}
+
+function useFlushOnExit() {
+  useEffect(() => {
+    const flush = () => {
+      if (useRun.getState().isRunning) useRun.getState().pauseRun();
+    };
+    window.addEventListener("beforeunload", flush);
+    window.addEventListener("pagehide", flush);
+    return () => {
+      window.removeEventListener("beforeunload", flush);
+      window.removeEventListener("pagehide", flush);
+    };
+  }, []);
 }
 
 function App() {
   useTimerTick();
   useHotkeys();
+  useFlushOnExit();
 
   const splits = useRun((s) => s.splits);
   const activeIdx = useRun((s) => s.activeIdx);
@@ -74,6 +90,7 @@ function App() {
   const totalPbTimeMs = useRun((s) => s.totalPbTimeMs);
   const isRunning = useRun((s) => s.isRunning);
   const isFinished = useRun((s) => s.isFinished);
+  const mode = useRun((s) => s.mode);
   const runElapsedMs = useRun((s) => s.runElapsedMs);
   const runStartedAt = useRun((s) => s.runStartedAt);
   const splitStartedAt = useRun((s) => s.splitStartedAt);
@@ -141,6 +158,31 @@ function App() {
         </div>
       )}
 
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "flex-end",
+          gap: 8,
+          padding: "0 4px",
+        }}
+      >
+        <button
+          onClick={() => store.setMode(mode === "hits" ? "checklist" : "hits")}
+          title="Toggle between hits and no-death checklist mode"
+          style={{
+            padding: "4px 12px",
+            fontSize: 12,
+            fontWeight: 600,
+            background: mode === "checklist" ? "var(--good, #4ade80)" : "var(--panel-2)",
+            color: mode === "checklist" ? "#0a0a0a" : "var(--text)",
+            border: "1px solid var(--border)",
+            borderRadius: 6,
+          }}
+        >
+          Mode: {mode === "hits" ? "Hits" : "No-Death Checklist"}
+        </button>
+      </div>
+
       <header className="hc-header">
         <div className="hc-timer">
           <div className="hc-time-main">{formatTime(runMs)}</div>
@@ -150,8 +192,12 @@ function App() {
           </div>
         </div>
         <div className="hc-hits">
-          <div className="hc-hits-label">HITS</div>
-          <div className="hc-hits-value">{totalHits}</div>
+          <div className="hc-hits-label">{mode === "checklist" ? "DONE" : "HITS"}</div>
+          <div className="hc-hits-value">
+            {mode === "checklist"
+              ? `${splits.filter((sp) => sp.done).length}/${splits.length}`
+              : totalHits}
+          </div>
         </div>
       </header>
 
@@ -163,11 +209,15 @@ function App() {
           <button onClick={store.resumeRun}>Resume (Space)</button>
         )}
         {isRunning && <button onClick={store.pauseRun}>Pause (Space)</button>}
-        <button onClick={store.addHit}>+Hit (H / Num1)</button>
-        <button onClick={store.undoHit}>Undo (Backspace / Num0)</button>
-        <button onClick={store.nextSplit} disabled={!isRunning}>
-          Next Split (N / Num2)
-        </button>
+        {mode === "hits" && (
+          <>
+            <button onClick={store.addHit}>+Hit (H / Num1)</button>
+            <button onClick={store.undoHit}>Undo (Backspace / Num0)</button>
+            <button onClick={store.nextSplit} disabled={!isRunning}>
+              Next Split (N / Num2)
+            </button>
+          </>
+        )}
         <button onClick={store.finishRun} disabled={!isRunning}>
           Finish
         </button>
@@ -353,7 +403,7 @@ function App() {
                 setDragOverId(null);
               }}
               className={`hc-split ${active ? "active" : ""} ${
-                i < activeIdx ? "done" : ""
+                (mode === "checklist" ? sp.done : i < activeIdx) ? "done" : ""
               } ${dragId === sp.id ? "dragging" : ""} ${
                 dragOverId === sp.id ? "drag-over" : ""
               }`}
@@ -366,28 +416,36 @@ function App() {
                 onChange={(e) => store.renameSplit(sp.id, e.currentTarget.value)}
               />
               <div className="hc-split-stats">
-                <span className="hc-stat">
-                  <b>{i === activeIdx ? sp.hits : sp.hits}</b>
-                  <small>
-                    {sp.pbHits !== null ? `PB ${sp.pbHits}` : "—"}
-                  </small>
-                </span>
-                <span
-                  className={`hc-delta ${
-                    hitsDelta === null
-                      ? ""
-                      : hitsDelta < 0
-                      ? "good"
-                      : hitsDelta > 0
-                      ? "bad"
-                      : ""
-                  }`}
-                >
-                  {hitsDelta === null ? "" : hitsDelta > 0 ? `+${hitsDelta}` : hitsDelta}
-                </span>
+                {mode === "hits" && (
+                  <>
+                    <span className="hc-stat">
+                      <b>{i === activeIdx ? sp.hits : sp.hits}</b>
+                      <small>
+                        {sp.pbHits !== null ? `PB ${sp.pbHits}` : "—"}
+                      </small>
+                    </span>
+                    <span
+                      className={`hc-delta ${
+                        hitsDelta === null
+                          ? ""
+                          : hitsDelta < 0
+                          ? "good"
+                          : hitsDelta > 0
+                          ? "bad"
+                          : ""
+                      }`}
+                    >
+                      {hitsDelta === null ? "" : hitsDelta > 0 ? `+${hitsDelta}` : hitsDelta}
+                    </span>
+                  </>
+                )}
                 <span className="hc-stat">
                   <b>
-                    {formatTime(i === activeIdx && isRunning ? splitMs : sp.timeMs)}
+                    {mode === "checklist"
+                      ? sp.completedAtMs != null
+                        ? formatTime(sp.completedAtMs)
+                        : "—"
+                      : formatTime(i === activeIdx && isRunning ? splitMs : sp.timeMs)}
                   </b>
                   <small>
                     {sp.pbTimeMs !== null ? formatTime(sp.pbTimeMs) : "—"}
@@ -407,34 +465,49 @@ function App() {
                     title="Move down"
                   >▼</button>
                 </div>
-                {(() => {
-                  const isCurrent = i === activeIdx && isRunning;
-                  const isDone = !!sp.done;
-                  const mark = isDone ? "✓" : isCurrent ? "▶" : "○";
-                  const color = isDone
-                    ? "#d4af37"
-                    : isCurrent
-                    ? "var(--accent)"
-                    : "rgba(255,255,255,0.35)";
-                  return (
-                    <button
-                      onClick={() => store.jumpToSplit(sp.id)}
-                      title="Jump to this split (marks previous as done)"
-                      style={{
-                        background: "transparent",
-                        border: "none",
-                        cursor: "pointer",
-                        fontWeight: 800,
-                        fontSize: 18,
-                        color,
-                        padding: "4px 8px",
-                        userSelect: "none",
-                      }}
-                    >
-                      {mark}
-                    </button>
-                  );
-                })()}
+                {mode === "checklist" ? (
+                  <input
+                    type="checkbox"
+                    checked={!!sp.done}
+                    onChange={() => store.toggleSplitDone(sp.id)}
+                    title="Mark complete (any order)"
+                    style={{
+                      width: 22,
+                      height: 22,
+                      cursor: "pointer",
+                      accentColor: "var(--good, #4ade80)",
+                    }}
+                  />
+                ) : (
+                  (() => {
+                    const isCurrent = i === activeIdx && isRunning;
+                    const isDone = !!sp.done;
+                    const mark = isDone ? "✓" : isCurrent ? "▶" : "○";
+                    const color = isDone
+                      ? "#d4af37"
+                      : isCurrent
+                      ? "var(--accent)"
+                      : "rgba(255,255,255,0.35)";
+                    return (
+                      <button
+                        onClick={() => store.jumpToSplit(sp.id)}
+                        title="Jump to this split (marks previous as done)"
+                        style={{
+                          background: "transparent",
+                          border: "none",
+                          cursor: "pointer",
+                          fontWeight: 800,
+                          fontSize: 18,
+                          color,
+                          padding: "4px 8px",
+                          userSelect: "none",
+                        }}
+                      >
+                        {mark}
+                      </button>
+                    );
+                  })()
+                )}
                 <button
                   className="hc-x"
                   onClick={() => store.removeSplit(sp.id)}

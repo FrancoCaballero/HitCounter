@@ -161,6 +161,11 @@
   }
   body.theme-table .splits-table tr.active td { color: var(--accent); }
   body.theme-table .splits-table tr.done { opacity: 0.72; }
+  body.theme-table .splits-table td.check { color: var(--good); font-weight: 800; text-align: center; }
+  body.theme-table .splits-table td.check.todo { color: rgba(255,255,255,0.3); }
+  body.mode-checklist .hits { color: var(--good); }
+  body.mode-checklist .split .check { color: var(--good); font-weight: 900; margin-right: 6px; }
+  body.mode-checklist .split .check.todo { color: rgba(255,255,255,0.4); }
   body.theme-table .splits-table tr.sep td {
     padding: 2px 10px;
     text-align: center;
@@ -257,7 +262,7 @@
   <div class="split" id="split"></div>
   <table class="splits-table" id="splitsTable" style="display:none">
     <thead>
-      <tr><th>Split</th><th class="col-hits">Hits / PB</th><th class="col-delta">Δ</th><th class="col-time">Time</th><th class="col-pb">PB time</th></tr>
+      <tr><th>Split</th><th class="col-hits">Hits / PB</th><th class="col-delta">&Delta;</th><th class="col-time">Time</th><th class="col-pb">PB time</th></tr>
     </thead>
     <tbody id="splitsTbody"></tbody>
   </table>
@@ -426,31 +431,66 @@
     const tbody = $("splitsTbody");
     const splits = Array.isArray(state.splits) ? state.splits : [];
     const activeIdx = state.activeIdx ?? -1;
-    const visible = buildWindow(splits, activeIdx, tableRows);
+    let focusIdx = activeIdx;
+    if (state.mode === "checklist") {
+      let bestT = -1;
+      let bestI = -1;
+      for (let i = 0; i < splits.length; i++) {
+        const t = splits[i].checkedAtTs;
+        if (splits[i].done && t != null && t > bestT) { bestT = t; bestI = i; }
+      }
+      if (bestI < 0) {
+        const firstTodo = splits.findIndex((sp) => !sp.done);
+        focusIdx = firstTodo >= 0 ? firstTodo : 0;
+      } else {
+        focusIdx = bestI;
+      }
+    }
+    const visible = buildWindow(splits, focusIdx, tableRows);
+    const checklist = state.mode === "checklist";
     const rows = visible.map(({ i, sep }) => {
       const sp = splits[i];
       const delta = sp.pbHits != null ? sp.hits - sp.pbHits : null;
       const dCls = delta == null ? "" : delta < 0 ? "good" : delta > 0 ? "bad" : "";
       const dTxt = delta == null ? "—" : delta > 0 ? `+${delta}` : delta;
       let rowCls = "";
-      if (state.isRunning && i === activeIdx) rowCls = "active";
-      else if (i < activeIdx || (state.isFinished && i <= activeIdx)) rowCls = "done";
+      if (checklist) {
+        if (sp.done) rowCls = "done";
+        else if (state.isRunning && i === activeIdx) rowCls = "active";
+      } else {
+        if (state.isRunning && i === activeIdx) rowCls = "active";
+        else if (i < activeIdx || (state.isFinished && i <= activeIdx)) rowCls = "done";
+      }
       if (sep) rowCls += " sep";
       let liveMs = sp.timeMs ?? 0;
       if (state.isRunning && i === activeIdx) liveMs += Date.now() - state.tsMs;
-      const timeTxt = liveMs > 0 ? fmt(liveMs) : "—";
+      const timeTxt = checklist
+        ? (sp.completedAtMs != null ? fmt(sp.completedAtMs) : "—")
+        : (liveMs > 0 ? fmt(liveMs) : "—");
       const pbTxt = sp.pbTimeMs != null ? fmt(sp.pbTimeMs) : "—";
+      const hitsCell = checklist
+        ? `<td class="col-hits check ${sp.done ? "" : "todo"}">${sp.done ? "✓" : "○"}</td>`
+        : `<td class="col-hits">${sp.hits ?? 0}${sp.pbHits != null ? ` / ${sp.pbHits}` : ""}</td>`;
+      const deltaCell = checklist
+        ? `<td class="col-delta"></td>`
+        : `<td class="col-delta delta ${dCls}">${dTxt}</td>`;
       return `<tr class="${rowCls.trim()}">
         <td class="name">${escapeHtml(sp.name ?? "")}</td>
-        <td class="col-hits">${sp.hits ?? 0}${sp.pbHits != null ? ` / ${sp.pbHits}` : ""}</td>
-        <td class="col-delta delta ${dCls}">${dTxt}</td>
+        ${hitsCell}
+        ${deltaCell}
         <td class="col-time">${timeTxt}</td>
         <td class="col-pb">${pbTxt}</td>
       </tr>`;
     }).join("");
     tbody.innerHTML = rows;
 
-    $("totHits").textContent = state.totalHits ?? 0;
+    if (state.mode === "checklist") {
+      const total = splits.length;
+      const done = state.doneCount ?? splits.filter((sp) => sp.done).length;
+      $("totHits").textContent = `${done}/${total}`;
+    } else {
+      $("totHits").textContent = state.totalHits ?? 0;
+    }
     let runMs = state.runElapsedMs ?? 0;
     if (state.isRunning) runMs += Date.now() - state.tsMs;
     $("totTime").textContent = fmt(runMs);
@@ -477,6 +517,11 @@
   function render() {
     if (!state) return;
     renderMultirun();
+    const checklist = state.mode === "checklist";
+    document.body.classList.toggle("mode-checklist", checklist);
+    const splitsArr = Array.isArray(state.splits) ? state.splits : [];
+    const headHits = document.querySelector("#splitsTable thead th.col-hits");
+    if (headHits) headHits.textContent = checklist ? "✓" : "Hits / PB";
     const isTable = document.body.classList.contains("theme-table");
     $("splitsTable").style.display = isTable ? "" : "none";
     $("splitsTotals").style.display = isTable ? "" : "none";
@@ -486,7 +531,12 @@
       return;
     }
     $("title").textContent = state.title ?? "";
-    $("hits").textContent = state.totalHits ?? 0;
+    if (checklist) {
+      const done = state.doneCount ?? splitsArr.filter((sp) => sp.done).length;
+      $("hits").textContent = `${done}/${splitsArr.length}`;
+    } else {
+      $("hits").textContent = state.totalHits ?? 0;
+    }
 
     let runMs = state.runElapsedMs ?? 0;
     if (state.isRunning) runMs = (state.runElapsedMs ?? 0) + (Date.now() - state.tsMs);
@@ -498,16 +548,27 @@
 
     const sp = state.activeSplit;
     if (sp) {
-      let splitMs = sp.timeMs ?? 0;
-      if (state.isRunning) splitMs += Date.now() - state.tsMs;
-      const delta = sp.pbHits != null ? sp.hits - sp.pbHits : null;
-      const dCls = delta == null ? "" : delta < 0 ? "good" : delta > 0 ? "bad" : "";
-      const dTxt = delta == null ? "" : delta > 0 ? `+${delta}` : delta;
-      $("split").innerHTML = `
-        <span class="name">${escapeHtml(sp.name ?? "")}</span>
-        <span class="sub">${sp.hits ?? 0} hits${sp.pbHits != null ? ` / PB ${sp.pbHits}` : ""} <span class="delta ${dCls}">${dTxt}</span></span>
-        <span class="sub">${fmt(splitMs)}${sp.pbTimeMs != null ? ` / ${fmt(sp.pbTimeMs)}` : ""}</span>
-      `;
+      if (checklist) {
+        const mark = sp.done ? "✓" : "○";
+        const markCls = sp.done ? "check" : "check todo";
+        const timeTxt = sp.completedAtMs != null ? fmt(sp.completedAtMs) : "—";
+        $("split").innerHTML = `
+          <span class="${markCls}">${mark}</span>
+          <span class="name">${escapeHtml(sp.name ?? "")}</span>
+          <span class="sub">${timeTxt}${sp.pbTimeMs != null ? ` / ${fmt(sp.pbTimeMs)}` : ""}</span>
+        `;
+      } else {
+        let splitMs = sp.timeMs ?? 0;
+        if (state.isRunning) splitMs += Date.now() - state.tsMs;
+        const delta = sp.pbHits != null ? sp.hits - sp.pbHits : null;
+        const dCls = delta == null ? "" : delta < 0 ? "good" : delta > 0 ? "bad" : "";
+        const dTxt = delta == null ? "" : delta > 0 ? `+${delta}` : delta;
+        $("split").innerHTML = `
+          <span class="name">${escapeHtml(sp.name ?? "")}</span>
+          <span class="sub">${sp.hits ?? 0} hits${sp.pbHits != null ? ` / PB ${sp.pbHits}` : ""} <span class="delta ${dCls}">${dTxt}</span></span>
+          <span class="sub">${fmt(splitMs)}${sp.pbTimeMs != null ? ` / ${fmt(sp.pbTimeMs)}` : ""}</span>
+        `;
+      }
     } else {
       $("split").textContent = "";
     }

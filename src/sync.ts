@@ -8,6 +8,9 @@ type SplitRow = {
   timeMs: number;
   pbHits: number | null;
   pbTimeMs: number | null;
+  done: boolean;
+  completedAtMs: number | null;
+  checkedAtTs: number | null;
 };
 
 type MultirunSubInfo = { name: string; completed: boolean; active: boolean };
@@ -16,9 +19,11 @@ type MultirunInfo = { title: string; runs: MultirunSubInfo[] } | null;
 type Snapshot = {
   tsMs: number;
   title: string;
+  mode: "hits" | "checklist";
   isRunning: boolean;
   isFinished: boolean;
   totalHits: number;
+  doneCount: number;
   totalPbHits: number | null;
   totalPbTimeMs: number | null;
   runElapsedMs: number;
@@ -48,6 +53,9 @@ function snapshot(): Snapshot {
         : row.timeMs,
     pbHits: row.pbHits,
     pbTimeMs: row.pbTimeMs,
+    done: !!row.done,
+    completedAtMs: row.completedAtMs ?? null,
+    checkedAtTs: row.checkedAtTs ?? null,
   }));
   const mr = useMultirun.getState();
   const activeM = mr.multiruns.find((m) => m.id === mr.activeMultirunId) || null;
@@ -64,9 +72,11 @@ function snapshot(): Snapshot {
   return {
     tsMs: Date.now(),
     title: s.title,
+    mode: s.mode,
     isRunning: s.isRunning,
     isFinished: s.isFinished,
     totalHits: s.totalHits,
+    doneCount: s.splits.filter((sp) => sp.done).length,
     totalPbHits: s.totalPbHits,
     totalPbTimeMs: s.totalPbTimeMs,
     runElapsedMs: runElapsed,
@@ -79,6 +89,9 @@ function snapshot(): Snapshot {
           timeMs: splitTime,
           pbHits: sp.pbHits,
           pbTimeMs: sp.pbTimeMs,
+          done: !!sp.done,
+          completedAtMs: sp.completedAtMs ?? null,
+          checkedAtTs: sp.checkedAtTs ?? null,
         }
       : null,
     multirun,
