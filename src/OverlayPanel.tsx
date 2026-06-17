@@ -21,6 +21,15 @@ const TITLE_FONTS: { id: string; name: string; family: string }[] = [
   { id: "metal", name: "Metal Mania (metal/dark)", family: '"Metal Mania", system-ui' },
 ];
 
+const SOURCE_ELEMENTS: { id: string; name: string }[] = [
+  { id: "title", name: "Title" },
+  { id: "totalHits", name: "Total hits" },
+  { id: "totalTimer", name: "Total timer" },
+  { id: "totalPb", name: "PB row" },
+  { id: "activeSplit", name: "Active split" },
+  { id: "multirun", name: "Multirun" },
+];
+
 const THEMES: Theme[] = [
   { id: "default", name: "Default", desc: "Hits + timer + active split (recommended)" },
   { id: "compact", name: "Compact", desc: "Single row: hits · time" },
@@ -44,11 +53,23 @@ export function OverlayPanel({ onClose }: { onClose: () => void }) {
   const [bgError, setBgError] = useState<string | null>(null);
   const [show, setShow] = useState(initial.show);
   const [base, setBase] = useState("http://localhost:17800/");
+  const [srcEls, setSrcEls] = useState<string[]>(["totalHits"]);
+  const [srcTheme, setSrcTheme] = useState("");
+  const [copied, setCopied] = useState<string | null>(null);
   const debounceRef = useRef<number | null>(null);
 
   useEffect(() => {
     getOverlayUrl().then(setBase);
   }, []);
+
+  const srcParams: string[] = [];
+  if (srcEls.length > 0 && srcEls.length < SOURCE_ELEMENTS.length) srcParams.push(`only=${srcEls.join(",")}`);
+  if (srcTheme) srcParams.push(`theme=${srcTheme}`);
+  const sourceUrl = srcParams.length ? `${base}${base.includes("?") ? "&" : "?"}${srcParams.join("&")}` : base;
+
+  function toggleSrcEl(id: string) {
+    setSrcEls((els) => (els.includes(id) ? els.filter((e) => e !== id) : [...els, id]));
+  }
 
   const style: OverlayStyle = { theme, accent, text, scale, noShadow, titleFont, tableRows, background, show };
 
@@ -66,8 +87,10 @@ export function OverlayPanel({ onClose }: { onClose: () => void }) {
     setShow((s) => ({ ...s, [key]: !s[key] }));
   }
 
-  async function copy() {
-    await navigator.clipboard.writeText(base);
+  async function copy(url: string, tag: string) {
+    await navigator.clipboard.writeText(url);
+    setCopied(tag);
+    window.setTimeout(() => setCopied((c) => (c === tag ? null : c)), 1500);
   }
 
   function onPickImage(file: File) {
@@ -348,13 +371,55 @@ export function OverlayPanel({ onClose }: { onClose: () => void }) {
           />
         </section>
 
-        <section className="hc-theme-url">
-          <input readOnly value={base} onFocus={(e) => e.currentTarget.select()} />
-          <button onClick={copy}>Copy</button>
-          <small style={{ display: "block", marginTop: 6, opacity: 0.7 }}>
-            Pegá esta URL en OBS una vez. Los cambios se aplican en vivo sin tocar OBS.
+        </div>
+
+        <div className="hc-obs-bar">
+          <div className="hc-obs-row">
+            <label className="hc-obs-label">URL principal</label>
+            <input className="hc-obs-input" readOnly value={base} onFocus={(e) => e.currentTarget.select()} />
+            <button className="hc-obs-copy" onClick={() => copy(base, "base")}>
+              {copied === "base" ? "¡Copiado!" : "Copiar"}
+            </button>
+          </div>
+
+          <div className="hc-obs-chips">
+            {SOURCE_ELEMENTS.map((el) => (
+              <label key={el.id} className={`hc-obs-chip ${srcEls.includes(el.id) ? "active" : ""}`}>
+                <input
+                  type="checkbox"
+                  checked={srcEls.includes(el.id)}
+                  onChange={() => toggleSrcEl(el.id)}
+                />
+                <span>{el.name}</span>
+              </label>
+            ))}
+          </div>
+
+          <div className="hc-obs-row">
+            <label className="hc-obs-label">Tema</label>
+            <select
+              className="hc-font-select"
+              value={srcTheme}
+              onChange={(e) => setSrcTheme(e.currentTarget.value)}
+              style={{ flex: 1 }}
+            >
+              <option value="">Usar tema global</option>
+              {THEMES.map((t) => (
+                <option key={t.id} value={t.id}>{t.name} — {t.desc}</option>
+              ))}
+            </select>
+          </div>
+
+          <div className="hc-obs-row">
+            <label className="hc-obs-label">URL por fuente</label>
+            <input className="hc-obs-input" readOnly value={sourceUrl} onFocus={(e) => e.currentTarget.select()} />
+            <button className="hc-obs-copy" onClick={() => copy(sourceUrl, "src")}>
+              {copied === "src" ? "¡Copiado!" : "Copiar"}
+            </button>
+          </div>
+          <small className="hc-obs-hint">
+            Elegí los elementos y pegá esta URL en una fuente aparte de OBS. Podés crear varias, cada una con su selección.
           </small>
-        </section>
         </div>
 
         <div className="hc-modal-foot">

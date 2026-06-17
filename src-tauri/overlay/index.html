@@ -332,8 +332,41 @@
     return v.startsWith("#") ? v : "#" + v;
   }
 
+  // Per-source overrides from URL. These win over the WS-pushed global style,
+  // so two OBS browser sources on the same URL can show different elements.
+  const SHOW_KEYS = ["title","totalHits","totalTimer","totalPb","activeSplit","multirun","tableTotals","colHits","colDelta","colTime","colPb"];
+  const SHOW_LOWER = {};
+  SHOW_KEYS.forEach((k) => { SHOW_LOWER[k.toLowerCase()] = k; });
+
+  function buildOverrides() {
+    const o = {};
+    if (params.has("theme")) o.theme = params.get("theme");
+    if (params.has("titlefont")) o.titleFont = params.get("titlefont");
+    if (params.has("accent")) o.accent = params.get("accent");
+    if (params.has("text")) o.text = params.get("text");
+    if (params.has("good")) o.good = params.get("good");
+    if (params.has("bad")) o.bad = params.get("bad");
+    if (params.has("muted")) o.muted = params.get("muted");
+    if (params.has("scale")) o.scale = params.get("scale");
+    if (params.has("noshadow")) o.noShadow = params.get("noshadow") === "1";
+    if (params.has("tablerows")) o.tableRows = params.get("tablerows");
+    const show = {};
+    const apply = (csv, val) => {
+      String(csv).split(",").forEach((name) => {
+        const k = SHOW_LOWER[name.trim().toLowerCase()];
+        if (k) show[k] = val;
+      });
+    };
+    if (params.has("only")) { SHOW_KEYS.forEach((k) => { show[k] = false; }); apply(params.get("only"), true); }
+    if (params.has("show")) apply(params.get("show"), true);
+    if (params.has("hide")) apply(params.get("hide"), false);
+    if (Object.keys(show).length) o.show = show;
+    return o;
+  }
+  const urlOverrides = buildOverrides();
+
   function applyStyle(s) {
-    s = s || {};
+    s = { ...(s || {}), ...urlOverrides, show: { ...((s || {}).show || {}), ...(urlOverrides.show || {}) } };
     const theme = (s.theme || "default").toLowerCase();
     const cls = ["theme-" + (validThemes.includes(theme) ? theme : "default")];
     const show = s.show || {};
